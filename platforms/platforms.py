@@ -45,7 +45,6 @@ class Spotify(Platform):
     def _fetch_library(self):
         albums = []
         limit = 50
-        reach = limit
         results = self.sp.current_user_saved_albums(limit=limit)
         num_albums = results['total']
         num_pages = math.ceil(num_albums / limit)
