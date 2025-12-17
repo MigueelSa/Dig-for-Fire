@@ -1,10 +1,14 @@
 from abc import ABC, abstractmethod
-import os, json, spotipy, math, logging, pickle, re
+import os, json, spotipy, math, logging, pickle, re, sys
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
 import musicbrainzngs as mb
 from musicbrainzngs import WebServiceError
 from typing import List, Dict, Any
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+from genres.genres import Genres
 
 logging.basicConfig(filename='errors.log',
                     filemode='a',
@@ -35,20 +39,24 @@ class Library(ABC):
         """Fetch albums from the platform and saves it to JSON file."""
         pass
 
-    def _save_library(self):
+    def _save_library(self, write_json=True):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         save_dir = os.path.abspath(os.path.join(script_dir, "../data/"))
         os.makedirs(save_dir, exist_ok=True)
 
-        file_name = f"{self.platform}-recomMLendation.json"
-        output_file = os.path.join(save_dir, file_name)
-        with open(output_file, "w") as f:
-            json.dump(self.library, f, indent=4)
+        if write_json:
+            file_name = f"{self.platform}-recomMLendation.json"
+            output_file = os.path.join(save_dir, file_name)
+            with open(output_file, "w") as f:
+                json.dump(self.library, f, indent=4)
 
         file_name = f"{self.platform}-recomMLendation.pkl"
         output_file = os.path.join(save_dir, file_name)
-        with open(output_file, "wb") as f:
+        tmp_file = output_file + ".tmp"
+
+        with open(tmp_file, "wb") as f:
             pickle.dump(self.library, f)
+        os.replace(tmp_file, output_file)
 
 class Spotify(Library):
 
@@ -107,10 +115,12 @@ class Spotify(Library):
 
 
 class MusicBrainz(Library):
+    genres     =       Genres()
 
     class Album(Library.Album):
         def __init__(self, data: Dict[str, Any]):
             self.data           =       data
+            self.genres         =       MusicBrainz.genres
 
             # release
             release             =       self.data.get("release", {})
@@ -129,7 +139,7 @@ class MusicBrainz(Library):
             self.type           =       release_group.get("type")
             self.date           =       release_group.get("first-release-date")
             tags_list           =       release_group.get("tag-list") or []
-            self.tags           =       self._clean_tags([tag.get("name") for tag in tags_list])
+            self.tags                =       self._clean_tags([tag.get("name") for tag in tags_list])
             # medium-list
             medium_list         =       release.get("medium-list") or []
             medium              =       medium_list[0] if len(medium_list) > 0 else {}
@@ -141,7 +151,7 @@ class MusicBrainz(Library):
     
             album["id"], album["status"], album["language"], album["barcode"], album["artwork"] = self.id, self.status, self.language, self.barcode, self.artwork
             album["artist"], album["countries"] = self.artist, self.countries
-            album["title"], album["type"], album["date"], album["tags"] = self.title, self.type, self.date, self.tags
+            album["title"], album["type"], album["date"], album["genres"] = self.title, self.type, self.date, self.tags
             album["track-count"] = self.track_count
 
             return album
@@ -149,16 +159,8 @@ class MusicBrainz(Library):
         def _clean_tags(self, tags: list[str]) -> list[str]:
             cleaned = []
             for t in tags:
-                tag = t.lower().strip()
-
-                is_not_domain = "." not in tag
-                has_no_colon = ":" not in tag
-                has_no_numbers = not re.search(r"\d", tag)
-
-                if is_not_domain and has_no_colon and has_no_numbers:
-                    cleaned.append(tag)
-                elif re.fullmatch(r"(?:\d{2}|\d{4})s", tag):
-                    cleaned.append(tag)
+                tag = self.genres.normalize_genre(t)
+                cleaned.append(tag)
 
             return cleaned
 
@@ -170,9 +172,10 @@ class MusicBrainz(Library):
             self.local_library = json.load(f)
 
         self.platform           =       "MusicBrainz"
+        self.skipped_albums     =       set()
         self._fetch_library()
 
-    def _fetch_library(self) -> None:
+    def _fetch_library(self, batch_size=10) -> None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         save_dir = os.path.abspath(os.path.join(script_dir, "../data/"))
         pickle_file = os.path.join(save_dir, f"{self.platform}-recomMLendation.pkl")
@@ -183,7 +186,7 @@ class MusicBrainz(Library):
             library = []
         existing_albums = {(tuple(album["artist"]), album["title"].lower()) for album in library}
 
-        for album in tqdm(self.local_library, desc = "Enriching library with MusicBrainz...", leave = False):
+        for ialbum, album in enumerate(tqdm(self.local_library, desc = "Enriching library with MusicBrainz...", leave = False, mininterval=5.0)):
             artist, name = album.get("artist"), album.get("title")
             key = (tuple(artist), name.lower())
             if key in existing_albums:
@@ -212,6 +215,10 @@ class MusicBrainz(Library):
 
             library.append(album_data)
             existing_albums.add(key)
+
+            if ialbum % batch_size == 0:
+                self.library = library
+                self._save_library(write_json=False)
 
         self.library = library
         self._save_library()
