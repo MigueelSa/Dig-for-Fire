@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-from genres.genres import Genres
+from tags.tags import Tags
 
 logging.basicConfig(filename='errors.log',
                     filemode='a',
@@ -27,7 +27,6 @@ class Library(ABC):
 
         @abstractmethod
         def _clean_tags(self, tags: list[str]) -> list[str]:
-            """Convert tags into musical genres"""
             pass
 
     def __init__(self):
@@ -74,7 +73,7 @@ class Spotify(Library):
                 "artist": [artist['name'] for artist in album['artists']],
                 "release_date": album['release_date'],
                 "tracks": [track['name'] for track in tracks['items']],
-                "genres": []    # fill later from MusicBrainz
+                "Ss": []    # fill later from MusicBrainz
             }
             return normalized_album
 
@@ -115,12 +114,12 @@ class Spotify(Library):
 
 
 class MusicBrainz(Library):
-    genres     =       Genres()
+    tags     =       Tags()
 
     class Album(Library.Album):
         def __init__(self, data: Dict[str, Any]):
             self.data           =       data
-            self.genres         =       MusicBrainz.genres
+            self.tags         =       MusicBrainz.tags
 
             # release
             release             =       self.data.get("release", {})
@@ -139,7 +138,7 @@ class MusicBrainz(Library):
             self.type           =       release_group.get("type")
             self.date           =       release_group.get("first-release-date")
             tags_list           =       release_group.get("tag-list") or []
-            self.tags                =       self._clean_tags([tag.get("name") for tag in tags_list])
+            self.tags           =       self._clean_tags([tag.get("name") for tag in tags_list])
             # medium-list
             medium_list         =       release.get("medium-list") or []
             medium              =       medium_list[0] if len(medium_list) > 0 else {}
@@ -151,7 +150,7 @@ class MusicBrainz(Library):
     
             album["id"], album["status"], album["language"], album["barcode"], album["artwork"] = self.id, self.status, self.language, self.barcode, self.artwork
             album["artist"], album["countries"] = self.artist, self.countries
-            album["title"], album["type"], album["date"], album["genres"] = self.title, self.type, self.date, self.tags
+            album["title"], album["type"], album["date"], album["tags"] = self.title, self.type, self.date, self.tags
             album["track-count"] = self.track_count
 
             return album
@@ -159,8 +158,9 @@ class MusicBrainz(Library):
         def _clean_tags(self, tags: list[str]) -> list[str]:
             cleaned = []
             for t in tags:
-                tag = self.genres.normalize_genre(t)
-                cleaned.append(tag)
+                tag = self.tags.normalize_tag(t)
+                if tag:
+                    cleaned.append(tag)
 
             return cleaned
 
@@ -175,7 +175,8 @@ class MusicBrainz(Library):
         self.skipped_albums     =       set()
         self._fetch_library()
 
-    def _fetch_library(self, batch_size=10) -> None:
+    def _fetch_library(self, batch_size=50) -> None:
+        # this will still be slow on a rerun due to musicbrainz fetching albums and artists with a slight different name from spotify like albums with deluxe and characters like ^...
         script_dir = os.path.dirname(os.path.abspath(__file__))
         save_dir = os.path.abspath(os.path.join(script_dir, "../data/"))
         pickle_file = os.path.join(save_dir, f"{self.platform}-recomMLendation.pkl")
