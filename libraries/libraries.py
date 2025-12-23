@@ -137,12 +137,27 @@ class MusicBrainz(Library):
             self.title          =       release_group.get("title")
             self.type           =       release_group.get("type")
             self.date           =       release_group.get("first-release-date")
+            decade              =       self._get_decade()
             tags_list           =       release_group.get("tag-list") or []
-            self.tags           =       self._clean_tags([tag.get("name") for tag in tags_list])
+            tags                =       [tag.get("name") for tag in tags_list]
+            tags.append(decade)
+            self.tags           =       self._clean_tags(tags)
             # medium-list
             medium_list         =       release.get("medium-list") or []
             medium              =       medium_list[0] if len(medium_list) > 0 else {}
             self.track_count    =       medium.get("track-count")
+
+        def _get_decade(self) -> str | None:
+            date, year = self.date, None
+            if isinstance(date, str) and len(date) >= 4:
+                y = date[:4]
+                if y.isdigit():
+                    year = int(y)
+            if year is not None:
+                return str(year//10) + "0s"
+            else:
+                return None
+
 
 
         def _normalize_album(self) -> Dict[str, Any]:
