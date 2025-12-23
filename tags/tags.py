@@ -61,6 +61,8 @@ class Tags:
 
     @lru_cache(maxsize=None)
     def normalize_tag(self, tag_name: str) -> str | None:
+        if tag_name is None:
+            return
         tag_key = tag_name.lower().replace("/", " ").replace("-", " ").replace(" ", "_").replace("&", "and").strip()
 
         if tag_key in self.canonical_genres:
@@ -70,7 +72,7 @@ class Tags:
         else:
             #has_dots                =   "." in tag_key
             is_year                 =   re.match(r'^(\d{4})$', tag_key.strip())
-            is_decade               =   re.match(r'^\d{2,4}s$', tag_key.strip())
+            is_decade               =   re.match(r'^\d{2}s$', tag_key.strip())
             #has_digits_and_letters  =   re.match(r'^(?=.*\d)(?=.*[a-zA-Z]).+$', tag_key.strip())
             #if has_dots or has_digits_and_letters:
                 #return
