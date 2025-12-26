@@ -1,14 +1,20 @@
 import os, json
+import numpy as np
 from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import normalize
 
 class Recommender:
-    def __init__(self, library_path: list[dict]):
+    def __init__(self, library_path: str):
         self.library                =   self._load_library(library_path)
         self.library_space_matrix   =   self._library_space_matrix()
+        #self.similarity_matrix      =   cosine_similarity(self.library_space_matrix)
+        self.taste_vector           =   self._taste_vector()
+        self.similarity_matrix      =   cosine_similarity(self.library_space_matrix, self.taste_vector)
 
-    def recommend(library: list[dict], k: int = 5) -> list[dict]:
+
+    def recommend(self, library: list[dict], k: int = 5) -> list[dict]:
         """
         Input: your known albums
         Output: k new albums (not in library)
@@ -37,6 +43,13 @@ class Recommender:
         X = vectorizer.fit_transform(docs)
         return X
 
+    def _taste_vector(self) -> np.ndarray:
+        taste = self.library_space_matrix.sum(axis=0)
+        taste = np.asarray(taste)
+        taste = normalize(taste)
+        # now this should be true taste.shape == (1, V)
+        return taste
+
 if __name__ == "__main__":
     import argparse, time
     start_time = time.time()
@@ -47,6 +60,7 @@ if __name__ == "__main__":
     library = os.path.abspath(args.library_path)
 
     rec = Recommender(library)
+    S = rec.similarity_matrix
 
     end_time = time.time()
     elapsed = end_time - start_time
