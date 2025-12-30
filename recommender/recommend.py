@@ -6,6 +6,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import normalize
 import musicbrainzngs as mb
 from typing import Dict, Any
+import pandas as pd
+from tqdm import tqdm
 
 
 class Recommender:
@@ -29,16 +31,47 @@ class Recommender:
             album["release_date"], album["title"], album["artist"], album["tags"] = self.release_date, self.title, self.artist, self.tags
             return album
 
-    def __init__(self, library_path: str, email: str, app_name: str = "recomMLendation", version: str = "0.1", k: int = 10, limit: int = 50):
-        self.library                =   self._load_library(library_path)
-        self.library_space_matrix   =   self._library_space_matrix()
-        self.taste_vector           =   self._taste_vector()
-        self.similarity_matrix      =   cosine_similarity(self.library_space_matrix, self.taste_vector)
-        self.fetched_albums         =   self._fetch_albums(app_name, version, email, k, limit)
+    def __init__(self, library_path: str, email: str, app_name: str = "recomMLendation", version: str = "0.1", k: int = 5, limit: int = 100, threshold: float = 0.4):
+        self.library                                                                =   self._load_library(library_path)
+        self.library_space_matrix                                                   =   self._space_matrix(self.library)
+        self.taste_vector                                                           =   self._taste_vector()
+        self.app_name, self.version, self.email, self.k, self.limit, self.threshold =   app_name, version, email, k, limit, threshold   
 
 
+    def _fetch_recommendations(self) -> list[dict[str,any]]:
+        app_name, version, email, k, limit, threshold = self.app_name, self.version, self.email, self.k, self.limit, self.threshold
+        kept_albums = []
+        with tqdm(total=k, desc="Albums found.", leave = False) as pbar:
+            while len(kept_albums) < k:
+                fetched_albums = self._fetch_albums(app_name, version, email, k, limit)
+                fetched_albums_space_matrix = self._space_matrix(fetched_albums, create_space=False)
+                similarity_matrix = cosine_similarity(fetched_albums_space_matrix, self.taste_vector)
+                for album, similarity_score in zip(fetched_albums, similarity_matrix.flatten()):
+                    if similarity_score >= threshold and album not in [a for a, _ in kept_albums]:
+                        kept_albums.append((album, similarity_score))
+                        pbar.update(1)
+            df = pd.DataFrame(kept_albums, columns=["album", "score"])
+            df = df.sort_values("score", ascending=False)
+            top_albums = []
+            for _, row in df.iterrows():
+                album_info = row["album"]
+                top_albums.append({
+                    "artist": album_info.get("artist"),
+                    "title": album_info.get("title"),
+                    "release_date": album_info.get("release_date"),
+                    "tags": album_info.get("tags"),
+                    "score": row["score"]
+                })
+        return top_albums[:k]
 
-    def _load_library(self, library_path: str) -> dict[str, any]:
+    def recommend(self) -> str:
+        top_albums = self._fetch_recommendations()
+        output = ""
+        for ialbum,  album in enumerate(top_albums):
+            output += f"{ialbum+1}. {album['title']} by {', '.join(album['artist'])}. Tags: {', '.join(album['tags'])}. Similarity score: {album['score']}.\n"
+        return output
+
+    def _load_library(self, library_path: str) -> list[dict[str, any]]:
         with open(library_path, "r") as file:
             library = json.load(file)
         return library
@@ -50,14 +83,17 @@ class Recommender:
             tokens.append(album["decade"])
         return tokens
 
-    def _album_tags(self) -> list[str]:
-        docs = [" ".join(self._album_to_tokens(a)) for a in self.library]
+    def _album_tags(self, library: list[dict[str]]) -> list[str]:
+        docs = [" ".join(self._album_to_tokens(a)) for a in library]
         return docs
 
-    def _library_space_matrix(self) -> csr_matrix:
-        docs = self._album_tags()
-        vectorizer = TfidfVectorizer(lowercase=False, token_pattern=r"[^ ]+")
-        X = vectorizer.fit_transform(docs)
+    def _space_matrix(self, library: list[dict[str]], create_space=True) -> csr_matrix:
+        docs = self._album_tags(library)
+        if create_space:
+            self.vectorizer = TfidfVectorizer(lowercase=False, token_pattern=r"[^ ]+")
+            X = self.vectorizer.fit_transform(docs)
+        else:
+            X = self.vectorizer.transform(docs)
         return X
 
     def _taste_vector(self) -> np.ndarray:
@@ -68,7 +104,7 @@ class Recommender:
         return taste
 
     def _genre_randomizer(self, k: int) -> list:
-        docs = self._album_tags()
+        docs = self._album_tags(self.library)
         tokens = set()
         for album in docs:
             tokens.update(album.split())
@@ -102,8 +138,8 @@ if __name__ == "__main__":
     library, email = os.path.abspath(args.library_path), args.email
 
     rec = Recommender(library, email)
-    fetched_albums = rec.fetched_albums
-    print(fetched_albums)
+    recommendations = rec.recommend()
+    print(recommendations)
 
     end_time = time.time()
     elapsed = end_time - start_time
