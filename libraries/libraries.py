@@ -5,10 +5,13 @@ from tqdm import tqdm
 import musicbrainzngs as mb
 from musicbrainzngs import WebServiceError
 from typing import List, Dict, Any
+
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 from tags.tags import Tags
+from types.types import AlbumData, LibraryData
+from albums.albums import Album
 
 logging.basicConfig(filename='errors.log',
                     filemode='a',
@@ -17,17 +20,6 @@ logging.basicConfig(filename='errors.log',
 
 class Library(ABC):
     """Abstract class for any music platform."""
-
-    class Album(ABC):
-        """Abstract base album class."""
-        @abstractmethod
-        def _normalize_album(self) -> Dict[str, Any]:
-            """Convert raw album data to universal schema."""
-            pass
-
-        @abstractmethod
-        def _clean_tags(self, tags: list[str]) -> list[str]:
-            pass
 
     def __init__(self):
         self.platform: str | None = None
@@ -59,27 +51,6 @@ class Library(ABC):
 
 class Spotify(Library):
 
-    class Album(Library.Album):
-        def __init__(self, data: Dict[str, Any], sp_client: spotipy.Spotify):
-            self.data = data
-            self.sp = sp_client
-
-        def _normalize_album(self) -> Dict[str, Any]:
-            album = self.data
-            album_id = album['id']
-            tracks = self.sp.album_tracks(album_id)
-            normalized_album = {
-                "title": album['name'],
-                "artist": [artist['name'] for artist in album['artists']],
-                "release_date": album['release_date'],
-                "tracks": [track['name'] for track in tracks['items']],
-                "Ss": []    # fill later from MusicBrainz
-            }
-            return normalized_album
-
-        def _clean_tags(self, tags: list[str]) -> list[str]:
-            return tags
-
     def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
         super().__init__()
         self.sp             =       spotipy.Spotify(auth_manager=SpotifyOAuth(
@@ -93,6 +64,29 @@ class Spotify(Library):
         self.limit              =       50
         self._fetch_library()
 
+    def _feed_release(self, data: AlbumData) -> AlbumData:
+        # id
+        release_id      =   data.get("id")
+        # artist
+        artist_credit   =   data.get("artists") or []
+        artist          =   [artist.get("name") for artist in artist_credit if isinstance(artist, dict)]
+        # album
+        title           =   data.get("name", "")
+        date            =   data.get("release_date", "")
+        genres, tags    =   # function that splits the two
+
+        album = {
+                "id": release_id,
+                "title": title,
+                "artist": artist,
+                "date": date,
+                "genres": genres,
+                "tags": tags,
+                "source": self.platform
+                }
+
+        return album
+
     def _fetch_library(self) -> None:
         albums = []
         results = self.sp.current_user_saved_albums(limit=self.limit)
@@ -100,8 +94,8 @@ class Spotify(Library):
         num_pages = math.ceil(num_albums / self.limit)
         for _ in tqdm(range(num_pages), desc="Going through albums...", leave=False):
             for item in results['items']:
-                album = self.Album(item['album'], self.sp)
-                normalized_album = album._normalize_album()
+                album = self._feed_release(item["album"])
+                normalized_album = self.Album(item['album'])
                 albums.append(normalized_album)
 
             if results['next']:
@@ -116,69 +110,6 @@ class Spotify(Library):
 class MusicBrainz(Library):
     tags     =       Tags()
 
-    class Album(Library.Album):
-        def __init__(self, data: Dict[str, Any]):
-            self.data           =       data
-            self.tags         =       MusicBrainz.tags
-
-            # release
-            release             =       self.data.get("release", {})
-            self.id             =       release.get("id")       
-            self.status         =       release.get("status")
-            self.language       =       release.get("text-representation", {}).get("language")
-            self.barcode        =       release.get("barcode")
-            self.artwork        =       release.get("cover-art-archive", {}).get("artwork")
-            # artist-credit
-            artist_credit       =       release.get("artist-credit") or []
-            self.artist         =       [artist.get("artist", {}).get("name") for artist in artist_credit if isinstance(artist, dict)]
-            self.countries      =       [artist.get("artist", {}).get("country") for artist in artist_credit if isinstance(artist, dict) and artist.get("artist", {}).get("country")]
-            # release-group
-            release_group       =       release.get("release-group")
-            self.title          =       release_group.get("title")
-            self.type           =       release_group.get("type")
-            self.date           =       release_group.get("first-release-date")
-            decade              =       self._get_decade()
-            tags_list           =       release_group.get("tag-list") or []
-            tags                =       [tag.get("name") for tag in tags_list]
-            tags.append(decade)
-            self.tags           =       self._clean_tags(tags)
-            # medium-list
-            medium_list         =       release.get("medium-list") or []
-            medium              =       medium_list[0] if len(medium_list) > 0 else {}
-            self.track_count    =       medium.get("track-count")
-
-        def _get_decade(self) -> str | None:
-            date, year = self.date, None
-            if isinstance(date, str) and len(date) >= 4:
-                y = date[:4]
-                if y.isdigit():
-                    year = int(y)
-            if year is not None:
-                return str(year//10) + "0s"
-            else:
-                return None
-
-
-
-        def _normalize_album(self) -> Dict[str, Any]:
-            album = {}
-    
-            album["id"], album["status"], album["language"], album["barcode"], album["artwork"] = self.id, self.status, self.language, self.barcode, self.artwork
-            album["artist"], album["countries"] = self.artist, self.countries
-            album["title"], album["type"], album["date"], album["tags"] = self.title, self.type, self.date, self.tags
-            album["track-count"] = self.track_count
-
-            return album
-
-        def _clean_tags(self, tags: list[str]) -> list[str]:
-            cleaned = []
-            for t in tags:
-                tag = self.tags.normalize_tag(t)
-                if tag:
-                    cleaned.append(tag)
-
-            return cleaned
-
     def __init__(self, app_name: str, app_version: str, email: str, local_library_path: str):
         super().__init__()
         mb.set_useragent(app_name, app_version, email)
@@ -189,6 +120,32 @@ class MusicBrainz(Library):
         self.platform           =       "MusicBrainz"
         self.skipped_albums     =       set()
         self._fetch_library()
+
+
+    def _feed_release(self, data: AlbumData) -> AlbumData:
+        # release
+        release         =   data.get("release", {})   
+        release_id      =   release.get("id")
+        # artist
+        artist_credit   =   release.get("artist-credit") or []
+        artist          =   [artist.get("artist", {}).get("name") for artist in artist_credit if isinstance(artist, dict)]
+        # album
+        release_group   =   release.get("release-group") or {}
+        title           =   release_group.get("title", "")
+        date            =   release_group.get("first-release-date", "")
+        genres, tags    =   # function that splits the two
+
+        album = {
+                "id": release_id,
+                "title": title,
+                "artist": artist,
+                "date": date,
+                "genres": genres,
+                "tags": tags,
+                "source": self.platform
+                }
+
+        return album
 
     def _fetch_library(self, batch_size=50) -> None:
         # this will still be slow on a rerun due to musicbrainz fetching albums and artists with a slight different name from spotify like albums with deluxe and characters like ^...
@@ -216,9 +173,8 @@ class MusicBrainz(Library):
                     release = result["release-list"][0]
                     release_id = release["id"]
                     full = mb.get_release_by_id(release_id, includes=["tags", "release-groups", "artist-credits", "media"])
-                    new_album = self.Album(full)
-                    album_data = new_album._normalize_album().copy()
-                    album_data["source"] = "MusicBrainz"
+                    new_album = self._feed_release(full)
+                    album_data = # copy album function
 
                 else:
                     album_data = album.copy()
@@ -254,9 +210,8 @@ class MusicBrainz(Library):
                 release = result["release-list"][0]
                 release_id = release["id"]
                 full = mb.get_release_by_id(release_id, includes=["tags", "release-groups", "artist-credits", "media"])
-                new_album = self.Album(full)
-                album_data = new_album._normalize_album().copy()
-                album_data["source"] = "MusicBrainz"
+                new_album = self._feed_release(full)
+                album_data = # copy album function
                 self.library.append(album_data)
                 self._save_library()
 
