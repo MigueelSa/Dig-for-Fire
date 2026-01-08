@@ -9,27 +9,11 @@ from typing import Dict, Any
 import pandas as pd
 from tqdm import tqdm
 
+from types.types import AlbumData, LibraryData
+from albums.albums import Album
+
 
 class Recommender:
-
-    class Album():
-        def __init__(self, data: Dict[str, Any]):
-            self.data           =       data
-
-            # release
-            self.release_date   =       self.data.get("first-release-date")       
-            self.title          =       self.data.get("title")
-            # artist-credit
-            artist_credit       =       self.data.get("artist-credit") or []
-            self.artist         =       [artist.get("artist", {}).get("name") for artist in artist_credit if isinstance(artist, dict)]
-            # tag-list
-            tag_list            =       self.data.get("tag-list") or []
-            self.tags           =       [tag.get("name") for tag in tag_list if isinstance(tag, dict)]
-
-        def _normalize_album(self) -> Dict[str, any]:
-            album = {}
-            album["release_date"], album["title"], album["artist"], album["tags"] = self.release_date, self.title, self.artist, self.tags
-            return album
 
     def __init__(self, library_path: str, email: str, app_name: str = "recomMLendation", version: str = "0.1", k: int = 5, limit: int = 100, threshold: float = 0.4):
         self.library                                                                =   self._load_library(library_path)
@@ -37,8 +21,35 @@ class Recommender:
         self.taste_vector                                                           =   self._taste_vector()
         self.app_name, self.version, self.email, self.k, self.limit, self.threshold =   app_name, version, email, k, limit, threshold   
 
+    def _feed_release(self, data: AlbumData) -> AlbumData:
+        # release
+        release         =   data.get("release", {})   
+        release_id      =   release.get("id")
+        # artist
+        artist_credit   =   release.get("artist-credit") or []
+        artist          =   [artist.get("artist", {}).get("name") for artist in artist_credit if isinstance(artist, dict)]
+        # album
+        release_group   =   release.get("release-group") or {}
+        title           =   release_group.get("title", "")
+        date            =   release_group.get("first-release-date", "")
+        tags_list       =   release_group.get("tag-list") or []
+        tag_names       =   [tag.get("name") for tag in tags_list]
+        genres, tags    =   self.tags.genre_tags(tag_names)
+        tags.append(self.tags.get_decade(date))
 
-    def _fetch_recommendations(self) -> list[dict[str,any]]:
+        album = {
+                "id": release_id,
+                "title": title,
+                "artist": artist,
+                "date": date,
+                "genres": genres,
+                "tags": tags,
+                "source": self.platform
+                }
+
+        return album
+
+    def _fetch_recommendations(self) -> LibraryData:
         app_name, version, email, k, limit, threshold = self.app_name, self.version, self.email, self.k, self.limit, self.threshold
         kept_albums = []
         with tqdm(total=k, desc="Albums found.", leave = False) as pbar:
@@ -71,23 +82,23 @@ class Recommender:
             output += f"{ialbum+1}. {album['title']} by {', '.join(album['artist'])}. Tags: {', '.join(album['tags'])}. Similarity score: {album['score']}.\n"
         return output
 
-    def _load_library(self, library_path: str) -> list[dict[str, any]]:
+    def _load_library(self, library_path: str) -> LibraryData:
         with open(library_path, "r") as file:
             library = json.load(file)
         return library
 
-    def _album_to_tokens(self, album: dict[str, any]) -> list[str]:
+    def _album_to_tokens(self, album: AlbumData) -> list[str]:
         tokens = []
         tokens.extend(album.get("tags", []))
         if "decade" in album:
             tokens.append(album["decade"])
         return tokens
 
-    def _album_tags(self, library: list[dict[str]]) -> list[str]:
+    def _album_tags(self, library: LibraryData) -> list[str]:
         docs = [" ".join(self._album_to_tokens(a)) for a in library]
         return docs
 
-    def _space_matrix(self, library: list[dict[str]], create_space=True) -> csr_matrix:
+    def _space_matrix(self, library: LibraryData, create_space=True) -> csr_matrix:
         docs = self._album_tags(library)
         if create_space:
             self.vectorizer = TfidfVectorizer(lowercase=False, token_pattern=r"[^ ]+")
@@ -104,6 +115,7 @@ class Recommender:
         return taste
 
     def _genre_randomizer(self, k: int) -> list:
+        # do something that takes the frequency of the genre in the library into account
         docs = self._album_tags(self.library)
         tokens = set()
         for album in docs:
@@ -112,7 +124,7 @@ class Recommender:
         picked_genres = random.sample(tokens, k=k)
         return picked_genres
 
-    def _fetch_albums(self, app_name: str, version: str, email: str, k: int, limit: int) -> list[dict[str, any]]:
+    def _fetch_albums(self, app_name: str, version: str, email: str, k: int, limit: int) -> LibraryData:
         random_genres = self._genre_randomizer(k)
         mb.set_useragent(app_name, version, email)
         fetched_albums = []
@@ -120,9 +132,8 @@ class Recommender:
             result = mb.search_release_groups(query=f'tag:{genre} AND primarytype:album', limit=limit)
             releases = result["release-group-list"]
             for release in releases:
-                fetched_album = self.Album(release)
-                normalized_album = fetched_album._normalize_album()
-                fetched_albums.append(normalized_album)
+                fetched_album_dict = self._feed_release(release)
+                fetched_albums.append(fetched_album_dict)
         return fetched_albums
         
 
