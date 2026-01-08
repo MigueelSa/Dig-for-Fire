@@ -133,7 +133,7 @@ class MusicBrainz(Library):
         date            =   release_group.get("first-release-date", "")
         tags_list       =   release_group.get("tag-list") or []
         tag_names       =   [tag.get("name") for tag in tags_list]
-        genres, tags    =   self.tags.genre_tags(tag_names)
+        genres, tags    =   self.tags.genres_tags(tag_names)
         tags.append(self.tags.get_decade(date))
 
         album = {

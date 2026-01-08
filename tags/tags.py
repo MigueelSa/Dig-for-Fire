@@ -101,7 +101,7 @@ class Tags:
         else:
             return None 
 
-    def genres_tags(self, tag_names: list[Any]) -> list[str], list[str]:
+    def genres_tags(self, tag_names: list[Any]) -> tuple[list[str], list[str]]:
         genres, tags = [], []
         for tag_name in tag_names:
             normalized = self._normalize_tag(tag_name)

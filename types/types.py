@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, TypeDict
+from typing import Any, Dict, List, TypedDict
 
 class AlbumData(TypedDict):
     release_id: str
