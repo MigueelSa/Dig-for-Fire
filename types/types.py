@@ -1,5 +1,12 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TypeDict
 
-AlbumData = Dict[str, Any]
+class AlbumData(TypedDict):
+    release_id: str
+    title: str
+    artist: list[str]
+    date: str
+    genres: list[str]
+    tags: list[str]
+    source: str
+
 LibraryData = List[AlbumData]
-

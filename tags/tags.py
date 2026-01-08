@@ -2,6 +2,7 @@ import json, os, re
 import numpy as np
 from tqdm import tqdm
 from functools import lru_cache
+from typing import Any
 
 class Tags:
 
@@ -60,7 +61,7 @@ class Tags:
         self._save_repo()
 
     @lru_cache(maxsize=None)
-    def normalize_tag(self, tag_name: str) -> str | None:
+    def _normalize_tag(self, tag_name: str) -> str | None:
         if tag_name is None:
             return
         tag_key = tag_name.lower().replace("/", " ").replace("-", " ").replace(" ", "_").replace("&", "and").strip()
@@ -86,23 +87,32 @@ class Tags:
                 else:
                     tag_key = "20" + tag_key
             return tag_key
-        #elif tag_key in self.skipped_tags:
-            #return None
-        '''
+
+    def get_decade(self, date: str | None) -> str | None:
+        if date is None:
+            return None
+        year = None
+        if isinstance(date, str) and len(date) >= 4:
+            y = date[:4]
+            if y.isdigit():
+                year = int(y)
+        if year is not None:
+            return str(year//10) + "0s"
         else:
-            tag_user_name = input(f"{tag_key} is not recognized. Do you want to add it anyway? If so, type the name you want to save it as. If not, just press enter. ")
-            if tag_user_name != "":
-                if tag_user_name in self.aliases:
-                    tag_user_name = self.aliases[tag_user_name]
-                    return tag_user_name
-                tag_user_name = tag_user_name.lower().replace("/", " ").replace("-", " ").replace(" ", "_").replace("&", "and").strip()
-                self.edit_repo_tag(tag_user_name)
-                tqdm.write(f"{tag_user_name} was added.")
-                return tag_user_name
+            return None 
+
+    def genres_tags(self, tag_names: list[Any]) -> list[str], list[str]:
+        genres, tags = [], []
+        for tag_name in tag_names:
+            normalized = self._normalize_tag(tag_name)
+            if normalized is None:
+                continue
+            if normalized in self.canonical_genres or normalized in self.aliases.values():
+                genres.append(normalized)
             else:
-                self.skipped_tags.add(tag_key)
-                return None
-        '''
+                tags.append(normalized)
+        return genres, tags
+
 
     def edit_repo_genre(self, canonical_genre: str, alias: str | None = None, parent: str | list[str] | None = None) -> None:
         canonical_genres, aliases, parents   =   self.canonical_genres, self.aliases, self.parents
