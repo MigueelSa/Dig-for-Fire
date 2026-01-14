@@ -11,3 +11,6 @@ class Album:
 
     def __repr__(self):
         return f"Album(title={self.title!r}, artist={self.artist!r})"
+
+    def genres_tags(self) -> tuple[list[str],list[str]]:
+        return self.genres, self.tags

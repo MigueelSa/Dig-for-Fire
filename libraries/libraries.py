@@ -12,20 +12,17 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 from ..tags.tags import Tags
 from ..types.types import AlbumData, LibraryData
 
-logging.basicConfig(filename='errors.log',
-                    filemode='a',
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    level=logging.ERROR)
 
 class Library(ABC):
     """Abstract class for any music platform."""
 
     def __init__(self):
-        self.platform: str | None = None
-        self.library: List[Dict[str, Any]] = []
+        self.platform: str | None               =   None
+        self.library: LibraryData               =   []
+        self.local_library: LibraryData | None  =   None
     
     @abstractmethod
-    def _fetch_library(self) -> None:
+    def _fetch_library(self, **kwargs) -> None:
         """Fetch albums from the platform and saves it to JSON file."""
         pass
 
@@ -47,6 +44,17 @@ class Library(ABC):
         with open(tmp_file, "wb") as f:
             pickle.dump(self.library, f)
         os.replace(tmp_file, output_file)
+
+    def _load_library(self, library_path: str) -> LibraryData:
+        with open(library_path) as f:
+            library = json.load(f)
+        return library
+
+    def _canonical_album(self, album: AlbumData) -> tuple[str, tuple[str]]:
+            title = re.sub(r"\s+", " ", album["title"].lower().strip())
+            artist = tuple(sorted(re.sub(r"\s+", " ", a.lower().strip()) for a in album["artist"] if a))
+
+            return (title, artist)
 
 class Spotify(Library):
 
@@ -86,7 +94,7 @@ class Spotify(Library):
 
         return album
 
-    def _fetch_library(self) -> None:
+    def _fetch_library(self, **kwargs) -> None:
         albums = []
         results = self.sp.current_user_saved_albums(limit=self.limit)
         num_albums = results['total']
@@ -105,20 +113,17 @@ class Spotify(Library):
         self._save_library()
 
 
+
+
 class MusicBrainz(Library):
 
-    def __init__(self, app_name: str, app_version: str, email: str, local_library_path: str):
+    def __init__(self, app_name: str, app_version: str, email: str):
         super().__init__()
         mb.set_useragent(app_name, app_version, email)
-
-        with open(local_library_path, 'r') as f:
-            self.local_library = json.load(f)
 
         self.platform           =       "MusicBrainz"
         self.skipped_albums     =       set()
         self.tags               =       Tags()
-        self._fetch_library()
-
 
     def _feed_release(self, data: AlbumData) -> AlbumData:
         # release
@@ -148,23 +153,37 @@ class MusicBrainz(Library):
 
         return album
 
-    def _fetch_library(self, batch_size=50) -> None:
-        # this will still be slow on a rerun due to musicbrainz fetching albums and artists with a slight different name from spotify like albums with deluxe and characters like ^...
+    def fetch_library(self, local_library_path: str, batch_size: int = 50, **kwargs) -> None:
+        self.local_library = self._load_library(local_library_path)
+
         script_dir = os.path.dirname(os.path.abspath(__file__))
         save_dir = os.path.abspath(os.path.join(script_dir, "../data/"))
         pickle_file = os.path.join(save_dir, f"{self.platform}-recomMLendation.pkl")
+
         if os.path.exists(pickle_file):
             with open(pickle_file, "rb") as f:
-                library = pickle.load(f)
+                self.library = pickle.load(f)
         else:
-            library = []
-        existing_albums = {(tuple(album["artist"]), album["title"].lower()) for album in library}
+            self.library = []
+
+        self._fetch_library(batch_size=batch_size, **kwargs)
+        self._save_library()
+
+
+
+
+    def _fetch_library(self, batch_size: int = 50, **kwargs) -> None:
+        # this will still be slow on a rerun due to musicbrainz fetching albums and artists with a slight different name from spotify like albums with deluxe and characters like ^...
+        assert self.local_library is not None
+        library = self.library
+        existing_albums = {self._canonical_album(album) for album in library}
 
         for ialbum, album in enumerate(tqdm(self.local_library, desc = "Enriching library with MusicBrainz...", leave = False, mininterval=5.0)):
-            artist, name = album.get("artist"), album.get("title")
-            key = (tuple(artist), name.lower())
+            key = self._canonical_album(album)
             if key in existing_albums:
                 continue
+            artist, name = album.get("artist", []), album.get("title", "")
+            artist = " AND ".join(artist) if isinstance(artist, list) else artist
 
             try:
                 result = mb.search_releases(artist=artist, release=name, limit=1)
@@ -186,12 +205,11 @@ class MusicBrainz(Library):
             library.append(album_data)
             existing_albums.add(key)
 
-            if ialbum % batch_size == 0:
+            if (ialbum+1) % batch_size == 0:
                 self.library = library
                 self._save_library(write_json=False)
 
         self.library = library
-        self._save_library()
 
 
     def add_album(self, title: str, artist: str) -> None: 
@@ -228,9 +246,15 @@ if __name__ == "__main__":
     parser.add_argument('--library_path', type=str, required=True, help="Path of the local library.")
     args = parser.parse_args()
 
+    logging.basicConfig(filename='errors.log',
+                        filemode='a',
+                        format='%(asctime)s - %(levelname)s - %(message)s',
+                        level=logging.ERROR)
+
     app_name, app_version, email, library_path = args.app_name, args.app_version, args.email, os.path.abspath(args.library_path)
 
-    musicbrainz = MusicBrainz(app_name, app_version, email, library_path)
+    musicbrainz = MusicBrainz(app_name, app_version, email)
+    musicbrainz.fetch_library(library_path)
     musicbrainz.add_album("The Rainbow Goblins", "Masayoshi Takanaka")
 
     '''

@@ -5,59 +5,35 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import normalize
 import musicbrainzngs as mb
-from typing import Dict, Any
 import pandas as pd
 from tqdm import tqdm
+from collections import Counter
 
-from types.types import AlbumData, LibraryData
-from albums.albums import Album
+from ..types.types import AlbumData, LibraryData
+from ..libraries.libraries import MusicBrainz
 
 
 class Recommender:
 
-    def __init__(self, library_path: str, email: str, app_name: str = "recomMLendation", version: str = "0.1", k: int = 5, limit: int = 100, threshold: float = 0.4):
-        self.library                                                                =   self._load_library(library_path)
-        self.library_space_matrix                                                   =   self._space_matrix(self.library)
-        self.taste_vector                                                           =   self._taste_vector()
-        self.app_name, self.version, self.email, self.k, self.limit, self.threshold =   app_name, version, email, k, limit, threshold   
-
-    def _feed_release(self, data: AlbumData) -> AlbumData:
-        # release
-        release         =   data.get("release", {})   
-        release_id      =   release.get("id")
-        # artist
-        artist_credit   =   release.get("artist-credit") or []
-        artist          =   [artist.get("artist", {}).get("name") for artist in artist_credit if isinstance(artist, dict)]
-        # album
-        release_group   =   release.get("release-group") or {}
-        title           =   release_group.get("title", "")
-        date            =   release_group.get("first-release-date", "")
-        tags_list       =   release_group.get("tag-list") or []
-        tag_names       =   [tag.get("name") for tag in tags_list]
-        genres, tags    =   self.tags.genre_tags(tag_names)
-        tags.append(self.tags.get_decade(date))
-
-        album = {
-                "id": release_id,
-                "title": title,
-                "artist": artist,
-                "date": date,
-                "genres": genres,
-                "tags": tags,
-                "source": self.platform
-                }
-
-        return album
+    def __init__(self, library_path: str, email: str, app_name: str = "recomMLendation", app_version: str = "0.1", k: int = 5, limit: int = 1, threshold: float = 0.4):
+        self.mb_library                                                                 =   MusicBrainz(app_name, app_version, email)
+        self.library                                                                    =   self._load_library(library_path)
+        self.genre_space_matrix, self.tag_space_matrix                                  =   self._space_matrix(self.library)
+        self.taste_gv, self.taste_tv                                                    =   self._taste_vectors()
+        self.app_name, self.app_version, self.email, self.k, self.limit, self.threshold =   app_name, app_version, email, k, limit, threshold   
+        self.used_tokens                                                                =   set()    
 
     def _fetch_recommendations(self) -> LibraryData:
-        app_name, version, email, k, limit, threshold = self.app_name, self.version, self.email, self.k, self.limit, self.threshold
+        k, limit, threshold = self.k, self.limit, self.threshold
         kept_albums = []
         with tqdm(total=k, desc="Albums found.", leave = False) as pbar:
             while len(kept_albums) < k:
-                fetched_albums = self._fetch_albums(app_name, version, email, k, limit)
-                fetched_albums_space_matrix = self._space_matrix(fetched_albums, create_space=False)
-                similarity_matrix = cosine_similarity(fetched_albums_space_matrix, self.taste_vector)
-                for album, similarity_score in zip(fetched_albums, similarity_matrix.flatten()):
+                random_tokens = self._genre_tag_randomizer(1)
+                fetched_albums = self._fetch_albums(random_tokens, limit)
+                fetched_albums_gspace_matrix, fetched_albums_tspace_matrix = self._space_matrix(fetched_albums, create_space=False)
+                genre_similarity_projections, tag_similarity_projections = cosine_similarity(fetched_albums_gspace_matrix, self.taste_gv.reshape(1, -1)), cosine_similarity(fetched_albums_tspace_matrix, self.taste_tv.reshape(1, -1))
+                similarity_scores = self._similarity_scores(genre_similarity_projections, tag_similarity_projections)
+                for album, similarity_score in zip(fetched_albums, similarity_scores.flatten()):
                     if similarity_score >= threshold and album not in [a for a, _ in kept_albums]:
                         kept_albums.append((album, similarity_score))
                         pbar.update(1)
@@ -75,6 +51,11 @@ class Recommender:
                 })
         return top_albums[:k]
 
+    def _similarity_scores(self, genre_similarity_projections: np.ndarray, tag_similarity_projections: np.ndarray, genre_weight: float = 1.0, tag_weight: float = 0.1) -> np.ndarray:
+        genre_scores = genre_similarity_projections.flatten()
+        tag_scores = tag_similarity_projections.flatten()
+        combined_scores = (genre_weight * genre_scores + tag_weight * tag_scores) / (genre_weight + tag_weight)
+        return combined_scores
     def recommend(self) -> str:
         top_albums = self._fetch_recommendations()
         output = ""
@@ -87,52 +68,76 @@ class Recommender:
             library = json.load(file)
         return library
 
-    def _album_to_tokens(self, album: AlbumData) -> list[str]:
-        tokens = []
-        tokens.extend(album.get("tags", []))
-        if "decade" in album:
-            tokens.append(album["decade"])
-        return tokens
+    def _album_genres_tags(self, album: AlbumData) -> tuple[list[str], list[str]]:
+        genres, tags = [], []
+        genres.extend(album.get("genres", []))
+        tags.extend(album.get("tags", []))
+        return genres, tags
 
-    def _album_tags(self, library: LibraryData) -> list[str]:
-        docs = [" ".join(self._album_to_tokens(a)) for a in library]
-        return docs
+    def _library_genres_tags(self, library: LibraryData) -> tuple[list[str], list[str]]:
+        library_genres, library_tags = [], []
+        for album in library:
+            genres, tags = self._album_genres_tags(album)
+            library_genres.append(" ".join(genres))
+            library_tags.append(" ".join(tags))
+        return library_genres, library_tags
 
-    def _space_matrix(self, library: LibraryData, create_space=True) -> csr_matrix:
-        docs = self._album_tags(library)
+    def _space_matrix(self, library: LibraryData, create_space=True) -> tuple[csr_matrix, csr_matrix]:
+        library_genres, library_tags = self._library_genres_tags(library)
         if create_space:
-            self.vectorizer = TfidfVectorizer(lowercase=False, token_pattern=r"[^ ]+")
-            X = self.vectorizer.fit_transform(docs)
+            self.gvectorizer, self.tvectorizer = TfidfVectorizer(lowercase=False, token_pattern=r"[^ ]+"), TfidfVectorizer(lowercase=False, token_pattern=r"[^ ]+")
+            X, Y = self.gvectorizer.fit_transform(library_genres), self.tvectorizer.fit_transform(library_tags)
         else:
-            X = self.vectorizer.transform(docs)
-        return X
+            X, Y = self.gvectorizer.transform(library_genres), self.tvectorizer.transform(library_tags)
+        return X, Y
 
-    def _taste_vector(self) -> np.ndarray:
-        taste = self.library_space_matrix.sum(axis=0)
-        taste = np.asarray(taste)
-        taste = normalize(taste)
-        # now this should be true taste.shape == (1, V)
-        return taste
+    def _taste_vectors(self) -> tuple[np.ndarray, np.ndarray]:
+        gv, tv = self.genre_space_matrix.sum(axis=0), self.tag_space_matrix.sum(axis=0)
+        gv, tv = np.asarray(gv), np.asarray(tv)
+        gv, tv = normalize(gv), normalize(tv)
+        return gv, tv
 
-    def _genre_randomizer(self, k: int) -> list:
-        # do something that takes the frequency of the genre in the library into account
-        docs = self._album_tags(self.library)
-        tokens = set()
-        for album in docs:
-            tokens.update(album.split())
-        tokens = list(tokens)
-        picked_genres = random.sample(tokens, k=k)
-        return picked_genres
+    def _genre_tag_randomizer(self, k: int, genre_weight: float = 1.0, tag_weight: float = 0.1) -> list[tuple[str, str]]:
+        # Collect all genres and tags from the library
+        all_genres, all_tags = [], []
+        for album in self.library:
+            all_genres.extend(album.get("genres", []))
+            all_tags.extend(album.get("tags", []))
+        
+        # Count frequencies
+        genre_counts, tag_counts = Counter(all_genres), Counter(all_tags)
+        
+        # Create a weighted pool
+        pool = (
+        [(g, "genre", c) for g, c in genre_counts.items()] +
+        [(t, "tag", c) for t, c in tag_counts.items()]
+        )
 
-    def _fetch_albums(self, app_name: str, version: str, email: str, k: int, limit: int) -> LibraryData:
-        random_genres = self._genre_randomizer(k)
-        mb.set_useragent(app_name, version, email)
+        if not pool:
+            return []
+
+        # Separate items and weights
+        items, weights = zip(*[(x[:2], x[2] * (genre_weight if x[1] == "genre" else tag_weight)) for x in pool])
+        items, weights = list(items), np.array(weights, dtype=float)
+
+        random_tokens, tokens_set = [], set()
+        while len(random_tokens) < k:
+            selected = random.choices(items, weights=weights, k=1)[0]
+            token, _ = selected
+            if token not in self.used_tokens and token not in tokens_set:
+                random_tokens.append(selected)
+                tokens_set.add(token)
+        self.used_tokens.update(token for token, _ in random_tokens)
+        return random_tokens
+        
+
+    def _fetch_albums(self, tokens: list[tuple[str, str]], limit: int) -> LibraryData:
         fetched_albums = []
-        for ig, genre in enumerate(random_genres):
-            result = mb.search_release_groups(query=f'tag:{genre} AND primarytype:album', limit=limit)
+        for token, _ in tokens:
+            result = mb.search_release_groups(query=f'tag:{token} AND primarytype:album', limit=limit)
             releases = result["release-group-list"]
             for release in releases:
-                fetched_album_dict = self._feed_release(release)
+                fetched_album_dict = self.mb_library._feed_release(release)
                 fetched_albums.append(fetched_album_dict)
         return fetched_albums
         
