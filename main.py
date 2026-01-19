@@ -6,7 +6,6 @@ from utils.paths import output_path
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--email', type=str, required=True, help="Email linked to project.")
     parser.add_argument('--library_path', type=str, required=True, help="Path of the local library.")
     args = parser.parse_args()
     
