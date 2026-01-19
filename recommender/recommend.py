@@ -1,3 +1,4 @@
+import logging
 import os, json, random
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -9,46 +10,57 @@ import pandas as pd
 from tqdm import tqdm
 from collections import Counter
 
-from ..types.types import AlbumData, LibraryData
-from ..libraries.libraries import MusicBrainz
+from models.models import AlbumData, LibraryData
+from libraries.libraries import MusicBrainz
+from utils.paths import output_path
 
 
 class Recommender:
 
-    def __init__(self, library_path: str, email: str, app_name: str = "recomMLendation", app_version: str = "0.1", k: int = 5, limit: int = 1, threshold: float = 0.4):
+    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.3):
         self.mb_library                                                                 =   MusicBrainz(app_name, app_version, email)
         self.library                                                                    =   self._load_library(library_path)
         self.genre_space_matrix, self.tag_space_matrix                                  =   self._space_matrix(self.library)
         self.taste_gv, self.taste_tv                                                    =   self._taste_vectors()
         self.app_name, self.app_version, self.email, self.k, self.limit, self.threshold =   app_name, app_version, email, k, limit, threshold   
-        self.used_tokens                                                                =   set()    
+        self.used_tokens                                                                =   set()
+        self.excluded_albums                                                            =   self._excluded_albums()
 
     def _fetch_recommendations(self) -> LibraryData:
         k, limit, threshold = self.k, self.limit, self.threshold
-        kept_albums = []
+        kept_albums, kept_ids = [], set()
         with tqdm(total=k, desc="Albums found.", leave = False) as pbar:
             while len(kept_albums) < k:
                 random_tokens = self._genre_tag_randomizer(1)
                 fetched_albums = self._fetch_albums(random_tokens, limit)
+                if not fetched_albums:
+                    continue
                 fetched_albums_gspace_matrix, fetched_albums_tspace_matrix = self._space_matrix(fetched_albums, create_space=False)
                 genre_similarity_projections, tag_similarity_projections = cosine_similarity(fetched_albums_gspace_matrix, self.taste_gv.reshape(1, -1)), cosine_similarity(fetched_albums_tspace_matrix, self.taste_tv.reshape(1, -1))
                 similarity_scores = self._similarity_scores(genre_similarity_projections, tag_similarity_projections)
                 for album, similarity_score in zip(fetched_albums, similarity_scores.flatten()):
-                    if similarity_score >= threshold and album not in [a for a, _ in kept_albums]:
+                    album_id = self.mb_library._canonical_album(album)
+                    if similarity_score >= threshold and album_id not in kept_ids and album_id not in self.excluded_albums:
                         kept_albums.append((album, similarity_score))
+                        kept_ids.add(album_id)
+                        self.excluded_albums.add(album_id)
                         pbar.update(1)
             df = pd.DataFrame(kept_albums, columns=["album", "score"])
             df = df.sort_values("score", ascending=False)
             top_albums = []
             for _, row in df.iterrows():
                 album_info = row["album"]
-                top_albums.append({
-                    "artist": album_info.get("artist"),
+                album_dict = {
+                    "id": album_info.get("id"),
                     "title": album_info.get("title"),
-                    "release_date": album_info.get("release_date"),
-                    "tags": album_info.get("tags"),
+                    "artist": album_info.get("artist"),
+                    "date": album_info.get("date"),
+                    "genres": album_info.get("genres", []),
+                    "tags": album_info.get("tags", []),
+                    "source": album_info.get("source"),
                     "score": row["score"]
-                })
+                }
+                top_albums.append(album_dict)
         return top_albums[:k]
 
     def _similarity_scores(self, genre_similarity_projections: np.ndarray, tag_similarity_projections: np.ndarray, genre_weight: float = 1.0, tag_weight: float = 0.1) -> np.ndarray:
@@ -56,11 +68,13 @@ class Recommender:
         tag_scores = tag_similarity_projections.flatten()
         combined_scores = (genre_weight * genre_scores + tag_weight * tag_scores) / (genre_weight + tag_weight)
         return combined_scores
+    
     def recommend(self) -> str:
         top_albums = self._fetch_recommendations()
+        self._save_recommendations(top_albums)
         output = ""
         for ialbum,  album in enumerate(top_albums):
-            output += f"{ialbum+1}. {album['title']} by {', '.join(album['artist'])}. Tags: {', '.join(album['tags'])}. Similarity score: {album['score']}.\n"
+            output += f"{ialbum+1}. {album['title']} by {', '.join(album['artist'])}. Genres: {', '.join(album['genres'])}. Tags: {', '.join(album['tags'])}. Similarity score: {album['score']}.\n"
         return output
 
     def _load_library(self, library_path: str) -> LibraryData:
@@ -69,10 +83,16 @@ class Recommender:
         return library
 
     def _album_genres_tags(self, album: AlbumData) -> tuple[list[str], list[str]]:
-        genres, tags = [], []
-        genres.extend(album.get("genres", []))
-        tags.extend(album.get("tags", []))
-        return genres, tags
+        genres = list(album.get("genres", []))
+        tags = list(album.get("tags", []))
+        genre_set = set(genres)
+        for genre in genres:
+            parents = self.mb_library.tags.parents.get(genre) or []
+            for parent in parents:
+                if parent in genre_set:
+                    genre_set.remove(parent)
+        filtered_genres = list(genre_set)
+        return filtered_genres, tags
 
     def _library_genres_tags(self, library: LibraryData) -> tuple[list[str], list[str]]:
         library_genres, library_tags = [], []
@@ -134,17 +154,59 @@ class Recommender:
     def _fetch_albums(self, tokens: list[tuple[str, str]], limit: int) -> LibraryData:
         fetched_albums = []
         for token, _ in tokens:
-            result = mb.search_release_groups(query=f'tag:{token} AND primarytype:album', limit=limit)
-            releases = result["release-group-list"]
+            result = mb.search_releases(query=f'tag:{token} AND primarytype:album', limit=limit)
+            releases = result.get("release-list", [])
             for release in releases:
-                fetched_album_dict = self.mb_library._feed_release(release)
-                fetched_albums.append(fetched_album_dict)
+                release_id = release.get("id")
+                if not release_id:
+                    continue
+                try:
+                    full = mb.get_release_by_id(release_id, includes=["tags", "artist-credits", "release-groups", "media"])
+                except mb.ResponseError as e:
+                    logging.warning(f"Skipping release {release_id}: {e}")
+                    continue
+                fetched_album_dict = self.mb_library._feed_release(full)
+                fetched_album_id = self.mb_library._canonical_album(fetched_album_dict)
+                if fetched_album_id not in self.excluded_albums:
+                    fetched_albums.append(fetched_album_dict)
         return fetched_albums
+    
+    def _save_recommendations(self, recommendations: LibraryData, output_path = output_path("data")) -> None:
+        recommendation_history_path = os.path.abspath(os.path.join(output_path, "recommendation-history-Dig-for-Fire.json"))
+        history = self._load_recommendations()
+        history.extend(recommendations)
+        with open(recommendation_history_path, "w") as file:
+            json.dump(history, file, indent=4)
+
+    def _load_recommendations(self, input_path = output_path("data", "recommendation-history-Dig-for-Fire.json")) -> LibraryData:
+        if not os.path.exists(input_path):
+            with open(input_path, "w") as file:
+                json.dump([], file)
+        with open(input_path, "r") as file:
+            recommendations = json.load(file)
+        return recommendations
+    
+    def _excluded_albums(self) -> set[tuple[str, str, str, str | None]]:
+        excluded = set()
+        recommendation_history = self._load_recommendations()
+        for album in recommendation_history:
+            album_id = self.mb_library._canonical_album(album)
+            excluded.add(album_id)
+        for album in self.library:
+            album_id = self.mb_library._canonical_album(album)
+            excluded.add(album_id)
+        return excluded
         
 
 
 if __name__ == "__main__":
     import argparse, time
+
+    logging.basicConfig(filename='errors.log',
+                        filemode='a',
+                        format='%(asctime)s - %(levelname)s - %(message)s',
+                        level=logging.ERROR)
+    
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--library_path', type=str, required=True, help="Path of the local library.")

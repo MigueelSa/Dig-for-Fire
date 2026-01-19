@@ -4,13 +4,10 @@ from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
 import musicbrainzngs as mb
 from musicbrainzngs import WebServiceError
-from typing import List, Dict, Any
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-#if project_root not in sys.path:
-#    sys.path.insert(0, project_root)
-from ..tags.tags import Tags
-from ..types.types import AlbumData, LibraryData
+from tags.tags import Tags
+from models.models import AlbumData, LibraryData
+from utils.paths import output_path
 
 
 class Library(ABC):
@@ -20,24 +17,25 @@ class Library(ABC):
         self.platform: str | None               =   None
         self.library: LibraryData               =   []
         self.local_library: LibraryData | None  =   None
-    
+
+        self.save_dir                           =   output_path("data")
+
     @abstractmethod
     def _fetch_library(self, **kwargs) -> None:
         """Fetch albums from the platform and saves it to JSON file."""
         pass
 
     def _save_library(self, write_json=True):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        save_dir = os.path.abspath(os.path.join(script_dir, "../data/"))
+        save_dir = self.save_dir
         os.makedirs(save_dir, exist_ok=True)
 
         if write_json:
-            file_name = f"{self.platform}-recomMLendation.json"
+            file_name = f"{self.platform}-Dig-for-Fire.json"
             output_file = os.path.join(save_dir, file_name)
             with open(output_file, "w") as f:
                 json.dump(self.library, f, indent=4)
 
-        file_name = f"{self.platform}-recomMLendation.pkl"
+        file_name = f"{self.platform}-Dig-for-Fire.pkl"
         output_file = os.path.join(save_dir, file_name)
         tmp_file = output_file + ".tmp"
 
@@ -50,11 +48,14 @@ class Library(ABC):
             library = json.load(f)
         return library
 
-    def _canonical_album(self, album: AlbumData) -> tuple[str, tuple[str]]:
+    def _canonical_album(self, album: AlbumData) -> tuple[str, tuple[str], tuple[str] | None]:
             title = re.sub(r"\s+", " ", album["title"].lower().strip())
+            title = re.sub(r"\(.*?\)|\[.*?\]|deluxe|remaster(ed)?", "", title)
             artist = tuple(sorted(re.sub(r"\s+", " ", a.lower().strip()) for a in album["artist"] if a))
+            date = album.get("date")
+            album_id = album.get("id")
 
-            return (title, artist)
+            return title, artist, date, album_id
 
 class Spotify(Library):
 
@@ -69,6 +70,7 @@ class Spotify(Library):
 
         self.platform           =       "Spotify"
         self.limit              =       50
+        self.save_dir           =       save_dir
         self._fetch_library()
 
     def _feed_release(self, data: AlbumData) -> AlbumData:
@@ -139,14 +141,16 @@ class MusicBrainz(Library):
         tags_list       =   release_group.get("tag-list") or []
         tag_names       =   [tag.get("name") for tag in tags_list]
         genres, tags    =   self.tags.genres_tags(tag_names)
-        tags.append(self.tags.get_decade(date))
+        decade          =   self.tags.get_decade(date)
+        if decade is not None:
+            tags.append(decade)
 
         album = {
                 "id": release_id,
                 "title": title,
                 "artist": artist,
                 "date": date,
-                "genres": genres,
+                "genres": list(set(genres)),
                 "tags": tags,
                 "source": self.platform
                 }
@@ -158,7 +162,7 @@ class MusicBrainz(Library):
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
         save_dir = os.path.abspath(os.path.join(script_dir, "../data/"))
-        pickle_file = os.path.join(save_dir, f"{self.platform}-recomMLendation.pkl")
+        pickle_file = os.path.join(save_dir, f"{self.platform}-Dig-for-Fire.pkl")
 
         if os.path.exists(pickle_file):
             with open(pickle_file, "rb") as f:
