@@ -210,10 +210,15 @@ __marimo__/
 data/
 dist/data
 
-# ideas file
+# random files
 ideas.txt
+compile.sh
+run.sh
 
 # Build outputs
 dist/
 build/
 *.log
+
+
+
