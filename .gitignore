@@ -208,3 +208,17 @@ __marimo__/
 
 # data folder
 data/
+dist/data
+
+# random files
+ideas.txt
+compile.sh
+run.sh
+
+# Build outputs
+dist/
+build/
+*.log
+
+
+
