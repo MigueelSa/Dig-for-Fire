@@ -12,7 +12,7 @@ Prototype music recommendation system.
 - Visualize top tags in the library.
 
 ## Installation
-1. Clone the repo:
+1. Clone the repo
 
 ```bash
 git clone https://github.com/MigueelSa/dig-for-fire.git
