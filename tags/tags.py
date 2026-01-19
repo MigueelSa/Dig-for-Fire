@@ -1,13 +1,12 @@
 import json, os, re
-import numpy as np
-from tqdm import tqdm
 from functools import lru_cache
 from typing import Any
+from utils.paths import resource_path
 
 class Tags:
 
     def __init__(self):
-        self.repo_file                                      =   os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "MusicBrainz-genres_repo.json"))
+        self.repo_file                                      =   resource_path("tags", "MusicBrainz-genres_repo.json")
         self.canonical_genres, self.aliases, self.parents   =   self._load_repo()
         #self.skipped_genres: set[str]                       =   set()
 
@@ -45,14 +44,14 @@ class Tags:
                 else:
                     canonical_genre, description = line, None
 
-                canonical_genre_split, parents, has_parents = canonical_genre.split(), [], False
+                canonical_genre = self._normalize_tag(canonical_genre)
+                canonical_genre_split, parents, has_parents = canonical_genre.split("_"), [], False
                 # this misses things like rock and rockabilly but avoids things rap and trap
-                if canonical_genre.strip() not in self.parents:
+                if canonical_genre not in self.parents:
                     for cg in canonical_genre_split:
                         if cg in self.parents:
                             parents.append(cg)
                             has_parents = True
-                canonical_genre = canonical_genre.replace("/", " ").replace("-", " ").replace(" ", "_").replace("&", "and").strip()
                 if has_parents:
                     self.edit_repo_genre(canonical_genre, alias = canonical_genre, parent = parents)
                 else:
