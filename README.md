@@ -2,14 +2,68 @@
 
 Prototype music recommendation system.
 
-> Work-in-progress. Machine learning integration planned.
+> Work-in-progress. Machine learning integration and web interface planned.
 
-## Features
+---
 
-- Fetch and enrich music libraries.
-- Generate recommendations based on genre/tag similarity.
-- Save recommendation history for incremental updates.
-- Visualize top tags in the library.
+## What this project does
+
+Dig-for-Fire takes a personal music library and:
+
+1. Enriches albums with high-quality metadata from MusicBrainz  
+2. Normalizes genres using a canonical genre + parent hierarchy  
+3. Builds a taste profile from the user’s library  
+4. Discovers new albums by querying MusicBrainz and ranking results
+   via similarity to the user’s taste
+
+The system is designed to be **incremental**:
+already-recommended albums are tracked and excluded in future runs.
+
+---
+
+## Recommendation approach (current)
+
+- **Representation**
+  - Genres and tags are embedded using TF-IDF
+  - Separate genre and tag spaces are maintained
+  - Parent genres are pruned to avoid redundancy
+
+- **User taste model**
+  - Taste vectors are computed as normalized sums over the library
+  - This makes the model interpretable and stable
+
+- **Discovery**
+  - Candidate albums are fetched from MusicBrainz using weighted
+    random sampling over existing genres/tags
+  - Albums are ranked via cosine similarity
+  - Thresholding avoids low-quality matches
+ 
+---
+
+## Project structure
+
+```
+libraries/      Fetch and normalize data from music platforms
+tags/           Canonical genre system with aliases and parent relations
+recommender/    Similarity-based recommendation engine
+analysis/       Exploratory analysis and visualization tools
+utils/          Path and IO utilities
+```
+---
+
+## Current state
+
+- Fully functional CLI pipeline
+- MusicBrainz enrichment implemented
+- Recommendation history persistence
+- Actively evolving recommender logic
+
+Known limitations (by design, for now):
+- No collaborative filtering
+- No deep learning models yet
+- CLI-first interface
+
+---
 
 ## Installation
 1. Clone the repo
@@ -19,7 +73,7 @@ git clone https://github.com/MigueelSa/dig-for-fire.git
 cd dig-for-fire
 ```
 
-2. Create a virtual environment
+2. Create a virtual environment (Python ≥3.11)
 
 ```bash
 python -m venv venv
@@ -43,6 +97,7 @@ python main.py --library_path path/to/Spotify-Dig-for-Fire.json
 
 
 **Example JSON library**
+
 **Minimal (only required fields)**
 
 ```json
@@ -61,6 +116,8 @@ python main.py --library_path path/to/Spotify-Dig-for-Fire.json
   }
 ]
 ```
+
+---
 
 Optional: Build standalone executable
 
@@ -84,7 +141,11 @@ pyinstaller --onefile --add-data tags/MusicBrainz-genres_repo.json:tags --name d
 
 - The executable will only work on the platform you built it on (Windows/Linux/macOS).
 
+---
+
 ## Future Plans
 
-- Add machine learning for smarter recommendations.
-- Implement a web interface for easier interaction.     
+- Improved genre–parent weighting
+- Smarter candidate sampling strategies
+- Optional ML-based embeddings
+- Web interface for interaction and visualization   
