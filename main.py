@@ -1,4 +1,4 @@
-import argparse, logging, os, sys
+import argparse, logging, os
 from libraries.libraries import MusicBrainz
 from recommender.recommend import Recommender
 from utils.paths import output_path
