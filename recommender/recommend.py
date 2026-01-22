@@ -117,32 +117,56 @@ class Recommender:
         gv, tv = normalize(gv), normalize(tv)
         return gv, tv
 
-    def _genre_tag_randomizer(self, k: int, genre_weight: float = 1.0, tag_weight: float = 0.1) -> list[tuple[str, str]]:
-        # Collect all genres and tags from the library
+    def _pools(self) -> tuple[dict[str, int], dict[str, int], dict[str, list[str]], dict[str, int]]:
         all_genres, all_tags = [], []
         for album in self.library:
             all_genres.extend(album.get("genres", []))
             all_tags.extend(album.get("tags", []))
-        
-        # Count frequencies
         genre_counts, tag_counts = Counter(all_genres), Counter(all_tags)
         
-        # Create a weighted pool
-        pool = (
-        [(g, "genre", c) for g, c in genre_counts.items()] +
-        [(t, "tag", c) for t, c in tag_counts.items()]
-        )
+        children_genres, parent_genres = {}, {}
+        parent_children = self.mb_library.tags._get_parents_children()
+        for parent, children in parent_children.items():
+            if parent in genre_counts:
+                parent_genres[parent] = genre_counts[parent]
+            for child in children:
+                children_genres[child] = genre_counts.get(child, 0)
 
-        if not pool:
-            return []
+        parent_unseen_children = {
+            parent: unseen
+            for parent, children in parent_children.items()
+            if parent in genre_counts
+            and (unseen := [child for child in children if children_genres.get(child, 0) == 0])
+        }
 
-        # Separate items and weights
-        items, weights = zip(*[(x[:2], x[2] * (genre_weight if x[1] == "genre" else tag_weight)) for x in pool])
-        items, weights = list(items), np.array(weights, dtype=float)
+        tags = dict(tag_counts)
+
+        return children_genres, parent_genres, parent_unseen_children, tags
+
+    def _genre_tag_randomizer(self, k: int, cg_probability: float = 0.6, pg_probability: float = 0.25) -> list[tuple[str, str]]:
+        children_genres, parent_genres, parent_unseen_children, tags = self._pools()
+
+        cg_items, cg_weights = list(children_genres.keys()), list(children_genres.values())
+        pg_items, pg_weights = [parent for parent in parent_genres.keys() if parent_unseen_children[parent]], list(parent_genres.values())
+        t_items, t_weights = list(tags.keys()), list(tags.values())
 
         random_tokens, tokens_set = [], set()
         while len(random_tokens) < k:
-            selected = random.choices(items, weights=weights, k=1)[0]
+            selected, r = None, random.random()
+            if r < cg_probability and cg_items:
+                selected = random.choices(cg_items, weights=cg_weights, k=1)[0], "genre"
+            elif r < cg_probability + pg_probability and pg_items:
+                parent = random.choices(pg_items, weights=pg_weights, k=1)[0]
+                selected = random.choices(parent_unseen_children.get(parent, []), k=1)[0], "genre"
+            elif t_items:
+                selected = random.choices(t_items, weights=t_weights, k=1)[0], "tag"
+
+            if selected is None:
+                available_items = [(x, "genre") for x in cg_items + pg_items] + [(x, "tag") for x in t_items]
+                if not available_items:
+                    break
+                selected = random.choice(available_items)
+
             token, _ = selected
             if token not in self.used_tokens and token not in tokens_set:
                 random_tokens.append(selected)

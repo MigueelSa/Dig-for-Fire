@@ -130,8 +130,19 @@ class Tags:
 
         self.canonical_genres, self.aliases, self.parents   =   canonical_genres, aliases, parents
 
+    def _get_parents_children(self) -> dict[str, list[str]]:
+        parents_children = {}
+        for genre in self.canonical_genres:
+            parents = self.parents.get(genre, [])
+            for p in parents:
+                parents_children.setdefault(p, [])
+                if genre not in parents_children[p]:
+                    parents_children[p].append(genre)
+        return parents_children
+
 if __name__ == "__main__":
     genres = Tags()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_txt = os.path.abspath(os.path.join(script_dir, "MusicBrainz-genres_repo.txt"))
-    genres.build_repo_from_txt(repo_txt)
+    #genres.build_repo_from_txt(repo_txt)
+    print(genres._get_parents_children())
