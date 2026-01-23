@@ -251,8 +251,7 @@ class Recommender:
         return excluded
 
     def _albums_parents(self, album: AlbumData) -> list[str]:
-        album_data = self.mb_library._feed_release(album)
-        genres, _ = self.mb_library.tags.genres_tags(album_data)
+        genres = album.get("genres", [])
         parents = set()
         for genre in genres:
             genre_parents = self.mb_library.tags.parents.get(genre) or []
