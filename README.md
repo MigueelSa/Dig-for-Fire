@@ -94,6 +94,7 @@ python main.py --library_path path/to/Spotify-Dig-for-Fire.json
 ```
 
 - The library file must be a JSON file containing your albums.
+
 **Note**: The first run may take a while due to MusicBrainz’s API rate limits. Subsequent runs are much faster.
 
 
