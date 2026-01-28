@@ -48,7 +48,7 @@ class Tags:
                 genres.add(canonical_genre)
 
         for genre in genres:
-                parents = {p for p in genres if "_" + p in genre or p + "_" in genre}
+                parents = {p for p in genres if "_" + p + "_" in genre or genre.startswith(p + "_") or genre.endswith("_" + p)}
                 if parents:
                     self.edit_repo_genre(genre, alias = genre, parent = list(parents))
                 else:
@@ -111,30 +111,26 @@ class Tags:
         else:
             return None 
 
-    def genres_parents_tags(self, tag_names: list[Any]) -> tuple[list[str], list[str], list[str]]:
+    def genres_tags(self, tag_names: list[Any]) -> tuple[list[str], list[str], list[str]]:
         """
-        Separate tag names into genres, parent genres, and other tags.
+        Separate tag names into genres and other tags.
         
         :param self: Instance of the Tags class.
         :param tag_names: List of tag names to be categorized.
         :type tag_names: list[Any]
-        :return: A tuple containing three lists: genres, parent genres, and other tags.
-        :rtype: tuple[list[str], list[str], list[str]]
+        :return: A tuple containing two lists: genres and other tags.
+        :rtype: tuple[list[str], list[str]]
         """
-        library_parents = set(self._get_parents_children().keys())
-        genres, parents, tags = [], [], []
+        genres, tags = [], []
         for tag_name in tag_names:
             normalized = self._normalize_tag(tag_name)
             if normalized is None:
                 continue
             elif normalized in self.canonical_genres or normalized in self.aliases.values():
-                if normalized in library_parents:
-                    parents.append(normalized)
-                else:
-                    genres.append(normalized)
+                genres.append(normalized)
             else:
                 tags.append(normalized)
-        return genres, parents, tags
+        return genres, tags
 
 
     def edit_repo_genre(self, canonical_genre: str, alias: str | None = None, parent: str | list[str] | None = None) -> None:
@@ -175,4 +171,9 @@ if __name__ == "__main__":
     genres = Tags()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_txt = os.path.abspath(os.path.join(script_dir, "MusicBrainz-genres_repo.txt"))
+
+    # manual labor here
+    genres.edit_repo_genre("trap", parent = ["gangsta_rap", "hardcore_hip_hop", "electronic"])
+
+    
     genres.build_repo_from_txt(repo_txt)
