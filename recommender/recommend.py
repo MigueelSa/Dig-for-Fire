@@ -17,14 +17,15 @@ from utils.paths import output_path
 class Recommender:
 
     def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.6):
-        self.mb_library                                                                     =   MusicBrainz(app_name, app_version, email)
-        self.library                                                                        =   self._load_library(library_path)
-        self.library_embeddings                                                             =   self._load_embeddings()
-        self.taste_gv, self.taste_pv, self.taste_tv                                         =   self._taste_vectors()
-        self.app_name, self.app_version, self.email, self.k, self.limit, self.threshold     =   app_name, app_version, email, k, limit, threshold   
-        self.used_tokens                                                                    =   set()
-        self.excluded_albums                                                                =   self._excluded_albums()
-        self.children_genres, self.parent_genres, self.parent_unseen_children, self.tags    =   self._pools()
+        self.mb_library                                                                         =   MusicBrainz(app_name, app_version, email)
+        self.library                                                                            =   self._load_library(library_path)
+        self.roots                                                                              =   self._roots() 
+        self.library_embeddings                                                                 =   self._load_embeddings()
+        self.taste_gv, self.taste_pv, self.taste_tv                                             =   self._taste_vectors()
+        self.app_name, self.app_version, self.email, self.k, self.limit, self.threshold         =   app_name, app_version, email, k, limit, threshold   
+        self.used_tokens                                                                        =   set()
+        self.excluded_albums                                                                    =   self._excluded_albums()
+        self.genre_counts, self.root_counts, self.tag_counts, self.unseen_siblings              =   self._pools()
 
     def _fetch_recommendations(self) -> LibraryData:
         k, limit, threshold = self.k, self.limit, self.threshold
@@ -86,93 +87,119 @@ class Recommender:
             library = json.load(file)
         return library
 
-    def _album_genres_parents_tags(self, album: AlbumData) -> tuple[list[str], list[str], list[str]]:
+    def _album_genres_tags(self, album: AlbumData) -> tuple[dict[str, int], list[str]]:
         """
-        Extract genres, parent genres, and tags from an album.
-        
+        Extract genres with minimal distance from leaf genres and other tags from an album.
+
+        Each genre in the returned dictionary includes its minimal distance from the
+        album's original genres (0 for direct genres, 1+ for ancestor genres).
+
         :param self: Instance of the Recommender class.
         :param album: Album data.
         :type album: AlbumData
-        :return: A tuple containing three lists: genres, parent genres, and tags.
-        :rtype: tuple[list[str], list[str], list[str]]
+        :return: A tuple containing:
+            - A dictionary mapping genre names to their minimal distance from the album's genres.
+            - A list of other tags associated with the album.
+        :rtype: tuple[dict[str, int], list[str]]
         """
-        genres, parents, tags = list(album.get("genres", [])), list(album.get("parents", [])), list(album.get("tags", []))
-        """
-        genre_set = set(genres)
-        for genre in genres:
-            parents = self.mb_library.tags.parents.get(genre) or []
-            for parent in parents:
-                if parent in genre_set:
-                    genre_set.remove(parent)
-        filtered_genres = list(genre_set)
-        """
-        return genres, parents, tags
+        genres, tags = album.get("genres", {}), list(album.get("tags", []))
+        
+        return genres, tags
     
 
     def _taste_vectors(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        gv, pv, tv = None, None, None
+        gv, tv = None, None
 
         for album in self.library:
-            album_genres, album_parents, album_tags = self._album_embeddings(album)
+            album_genres, album_tags = self._album_embeddings(album)
 
             if album_genres.all():
                 gv_vec = album_genres
                 gv = gv_vec if gv is None else gv + gv_vec
-
-            if album_parents.all():
-                pv_vec = album_parents
-                pv = pv_vec if pv is None else pv + pv_vec
 
             if album_tags.all():
                 tv_vec = album_tags
                 tv = tv_vec if tv is None else tv + tv_vec
 
         gv = normalize(gv.reshape(1, -1)) if gv is not None else np.zeros((1, len(next(iter(self.library_embeddings.values())))))
-        pv = normalize(pv.reshape(1, -1)) if pv is not None else np.zeros((1, len(next(iter(self.library_embeddings.values())))))
         tv = normalize(tv.reshape(1, -1)) if tv is not None else np.zeros((1, len(next(iter(self.library_embeddings.values())))))
 
-        return gv, pv, tv
+        return gv, tv
 
 
-    def _pools(self) -> tuple[dict[str, int], dict[str, int], dict[str, list[str]], dict[str, int]]:
-        all_genres, all_tags = [], []
+    def _pools(self) -> tuple[dict[str, int], dict[str, int], dict[str, int], dict[str, list[str]]]:
+        """
+        Compute aggregate counts and unseen children for genres and tags in the library.
+
+        This function processes all albums in the library to produce summary data:
+
+        1. Counts of each individual genre across all albums (`genre_counts`).
+        2. Counts of each root genre (genres in `self._roots`) across all albums (`root_counts`).
+        3. Counts of all tags across all albums (`tag_counts`).
+        4. A mapping of genres in the library to their children that do not appear in the library (`unseen_siblings`).
+
+        :param self: Instance of the class containing the library and the MusicBrainz tags data.
+        :return: A tuple containing:
+            - genre_counts (dict[str, int]): Number of occurrences of each individual genre.
+            - root_counts (dict[str, int]): Number of occurrences of each root genre.
+            - tag_counts (dict[str, int]): Number of occurrences of each tag across all albums.
+            - unseen_siblings (dict[str, list[str]]): Genres mapped to their children that are missing from the library.
+        :rtype: tuple[dict[str, int], dict[str, int], dict[str, int], dict[str, list[str]]]
+        """
+
+        all_genres, all_roots, all_tags = [], []
         for album in self.library:
-            all_genres.extend(album.get("genres", []))
-            all_tags.extend(album.get("tags", []))
-        genre_counts, tag_counts = Counter(all_genres), Counter(all_tags)
+            album_genres, album_tags = self._album_genres_tags(album)
+            for genre in album_genres.keys():
+                if genre in self._roots:
+                    all_roots.append(genre)
+                else:
+                    all_genres.append(genre)
+            all_tags.extend(album_tags)
+        genre_counts, root_counts, tag_counts = dict(Counter(all_genres)), dict(Counter(all_roots)), dict(Counter(all_tags))
+
+        ancestor_children = self.mb_library.tags._get_ancestors_children()
+        unseen_siblings = {}
+        for genre in genre_counts.keys():
+            children = ancestor_children.get(genre, [])
+            unseen = [c for c in children if c not in genre_counts]
+            if unseen:
+                unseen_siblings[genre] = unseen
+        unseen_siblings = set(unseen_siblings)
+
+        return genre_counts, root_counts, tag_counts, unseen_siblings
+
+    def _genre_tag_randomizer(self, k: int, g_probability: float = 0.6, r_probability: float = 0.25) -> list[tuple[str, str]]:
+        """
+        Randomly select genres, roots, and tags from the library with weighted probabilities.
+
+        Selection rules:
+        1. Weighted random pick of non-root genres (`g_probability` chance).
+        2. Weighted random pick of a root, then a random unseen child of that root (`r_probability` chance).
+        3. Weighted random pick of tags for the remaining probability.
+
+        Duplicates are avoided with `self.used_tokens` and within the current call.
+
+        :param k: Number of tokens to select.
+        :param g_probability: Probability of selecting a genre.
+        :param r_probability: Probability of selecting a root + unseen child.
+        :return: A list of tuples `(token, type)` where type is "genre" or "tag".
+        :rtype: list[tuple[str, str]]
+        """
         
-        children_genres, parent_genres = {}, {}
-        parent_children = self.mb_library.tags._get_parents_children()
-        for parent, children in parent_children.items():
-            for child in children:
-                children_genres[child] = genre_counts.get(child, 0)
-                parent_genres[parent] = parent_genres.get(parent, 0) + genre_counts.get(child, 0)
+        genres, roots, tags, unseen_siblings = self.genre_counts, self.root_counts, self.tag_counts, self.unseen_siblings
 
-        parent_unseen_children = {
-            parent: unseen
-            for parent, children in parent_children.items()
-            if parent_genres.get(parent, 0) > 0
-            and (unseen := [child for child in children if children_genres.get(child, 0) == 0])
-        }
+        g_items, g_weights = [], []
+        for genre, weight in genres.items():
+            if genre not in self.used_tokens:
+                g_items.append(genre)
+                g_weights.append(weight)
 
-        tags = dict(tag_counts)
-
-        return children_genres, parent_genres, parent_unseen_children, tags
-
-    def _genre_tag_randomizer(self, k: int, cg_probability: float = 0.6, pg_probability: float = 0.25) -> list[tuple[str, str]]:
-        children_genres, parent_genres, parent_unseen_children, tags = self.children_genres, self.parent_genres, self.parent_unseen_children, self.tags
-
-        cg_items, cg_weights = [], []
-        for child, weight in children_genres.items():
-            if child not in self.used_tokens:
-                cg_items.append(child)
-                cg_weights.append(weight)
-
-        pg_items, pg_weights = [], []
-        for parent, weight in parent_genres.items():
-            if parent_unseen_children.get(parent) and parent not in self.used_tokens:
-                pg_items.append(parent)
-                pg_weights.append(weight)
+        r_items, r_weights = [], []
+        for root, weight in roots.items():
+            if unseen_siblings.get(root) and root not in self.used_tokens:
+                r_items.append(root)
+                r_weights.append(weight)
 
         t_items, t_weights = [], []
         for tag, weight in tags.items():
@@ -183,16 +210,16 @@ class Recommender:
         random_tokens, tokens_set = [], set()
         while len(random_tokens) < k:
             selected, r = None, random.random()
-            if r < cg_probability and cg_items:
-                selected = random.choices(cg_items, weights=cg_weights, k=1)[0], "genre"
-            elif r < cg_probability + pg_probability and pg_items:
-                parent = random.choices(pg_items, weights=pg_weights, k=1)[0]
-                selected = random.choices(parent_unseen_children.get(parent, []), k=1)[0], "genre"
+            if r < g_probability and g_items:
+                selected = random.choices(g_items, weights=g_weights, k=1)[0], "genre"
+            elif r < g_probability + r_probability and r_items:
+                root = random.choices(r_items, weights=r_weights, k=1)[0]
+                selected = random.choice(unseen_siblings.get(root, [])), "genre"
             elif t_items:
                 selected = random.choices(t_items, weights=t_weights, k=1)[0], "tag"
 
             if selected is None:
-                available_items = [(x, "genre") for x in cg_items + pg_items] + [(x, "tag") for x in t_items]
+                available_items = [(x, "genre") for x in g_items + r_items] + [(x, "tag") for x in t_items]
                 if not available_items:
                     break
                 selected = random.choice(available_items)
@@ -258,13 +285,15 @@ class Recommender:
             excluded.add(album_id)
         return excluded
 
+    """
     def _albums_parents(self, album: AlbumData) -> list[str]:
-        genres = album.get("genres", [])
+        genres, _ = self._album_genres_tags(album)
         parents = set()
-        for genre in genres:
+        for genre in genres.keys():
             genre_parents = self.mb_library.tags.parents.get(genre) or []
             parents.update(genre_parents)
         return list(parents)
+    """
     
     def _coocurrence_matrix(self) -> tuple[np.ndarray, set[str, int]]:
         """
@@ -346,10 +375,10 @@ class Recommender:
         return {token: vectors[i] for i, token in enumerate(tokens)}
     
 
-    def _album_embeddings(self, album: AlbumData) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _album_embeddings(self, album: AlbumData) -> tuple[np.ndarray, np.ndarray]:
         any_token = next(iter(self.library_embeddings))
         vector_dim = self.library_embeddings[any_token].shape[0]
-        genres, parents, tags = self._album_genres_parents_tags(album)
+        genres, tags = self._album_genres_tags(album)
 
         zero_array = np.zeros(vector_dim, dtype=float)
 
@@ -357,30 +386,37 @@ class Recommender:
         for genre in genres:
             album_genres += self.library_embeddings.get(genre, zero_array)
 
-        album_parents = np.zeros(vector_dim, dtype=float)
-        for parent in parents:
-            album_parents += self.library_embeddings.get(parent, zero_array)
-
         album_tags = np.zeros(vector_dim, dtype=float)
         for tag in tags:
             album_tags += self.library_embeddings.get(tag, zero_array)
 
-        return album_genres, album_parents, album_tags
+        return album_genres, album_tags
     
     def _space_matrix(self, library: LibraryData) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        gv_list, pv_list, tv_list = [], [], []
+        gv_list, tv_list = [], [], []
         for album in library:
-            g, p, t = self._album_embeddings(album)
+            g, t = self._album_embeddings(album)
             gv_list.append(g)
-            pv_list.append(p)
             tv_list.append(t)
 
         G = normalize(np.vstack(gv_list))
-        P = normalize(np.vstack(pv_list))
         T = normalize(np.vstack(tv_list))
 
-        return G, P, T
-            
+        return G, T
+    
+    def _roots(self) -> set[str]:
+        """
+        Return the set of root genres in the library.
+
+        A root genre is defined as a genre that has no direct ancestors
+        in the `ancestors` mapping (its ancestor list is empty).
+
+        :return: Set of root genre names.
+        :rtype: set[str]
+        """
+        roots = set(genre for genre, ancestors in self.mb_library.tags.ancestors.items() if not ancestors)
+        return roots
+
     
 if __name__ == "__main__":
     import argparse, time

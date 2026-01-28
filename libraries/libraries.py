@@ -149,7 +149,7 @@ class MusicBrainz(Library):
         date                    =   release_group.get("first-release-date", "")
         tags_list               =   release_group.get("tag-list") or []
         tag_names               =   [tag.get("name") for tag in tags_list]
-        genres, parents, tags   =   self.tags.genres_parents_tags(tag_names)
+        genres, tags            =   self.tags.genres_tags(tag_names)
         decade                  =   self.tags.get_decade(date)
         if decade is not None:
             tags.append(decade)
@@ -159,8 +159,7 @@ class MusicBrainz(Library):
                 "title": title,
                 "artist": artist,
                 "date": date,
-                "genres": list(set(genres)),
-                "parents": list(set(parents)),
+                "genres": genres, # distance_dict
                 "tags": tags,
                 "source": self.platform
                 }
