@@ -215,6 +215,9 @@ ideas.txt
 compile.sh
 run.sh
 
+# backups
+*safe*
+
 # Build outputs
 dist/
 build/

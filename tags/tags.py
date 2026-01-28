@@ -32,7 +32,7 @@ class Tags:
         txt = os.path.abspath(genre_repo_txt_file)
         if not os.path.exists(txt):
             return
-
+        genres = set()
         with open(txt, "r") as t:
             for line in t:
                 line = line.strip()
@@ -45,6 +45,16 @@ class Tags:
                     canonical_genre, description = line, None
 
                 canonical_genre = self._normalize_tag(canonical_genre)
+                genres.add(canonical_genre)
+
+        for genre in genres:
+                parents = {p for p in genres if "_" + p in genre or p + "_" in genre}
+                if parents:
+                    self.edit_repo_genre(genre, alias = genre, parent = list(parents))
+                else:
+                    self.edit_repo_genre(genre, alias = genre)
+
+                """
                 canonical_genre_split, parents, has_parents = canonical_genre.split("_"), [], False
                 # this misses things like rock and rockabilly but avoids things rap and trap
                 if canonical_genre not in self.parents:
@@ -56,6 +66,7 @@ class Tags:
                     self.edit_repo_genre(canonical_genre, alias = canonical_genre, parent = parents)
                 else:
                     self.edit_repo_genre(canonical_genre, alias = canonical_genre)
+                """
 
         self._save_repo()
 
@@ -164,5 +175,4 @@ if __name__ == "__main__":
     genres = Tags()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_txt = os.path.abspath(os.path.join(script_dir, "MusicBrainz-genres_repo.txt"))
-    #genres.build_repo_from_txt(repo_txt)
-    print(genres._get_parents_children())
+    genres.build_repo_from_txt(repo_txt)
