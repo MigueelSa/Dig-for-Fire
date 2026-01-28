@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-import os, json, spotipy, math, logging, pickle, re, sys
+import os, json, spotipy, math, logging, pickle, re
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
 import musicbrainzngs as mb
@@ -128,20 +128,29 @@ class MusicBrainz(Library):
         self.tags               =       Tags()
 
     def _feed_release(self, data: AlbumData) -> AlbumData:
+        """
+        Feed release data from MusicBrainz into AlbumData structure.
+        
+        :param self: Instance of the MusicBrainz class.
+        :param data: Release data from MusicBrainz.
+        :type data: AlbumData
+        :return: AlbumData populated with relevant information.
+        :rtype: AlbumData
+        """
         # release
-        release         =   data.get("release", {})   
-        release_id      =   release.get("id")
+        release                 =   data.get("release", {})   
+        release_id              =   release.get("id")
         # artist
-        artist_credit   =   release.get("artist-credit") or []
-        artist          =   [artist.get("artist", {}).get("name") for artist in artist_credit if isinstance(artist, dict)]
+        artist_credit           =   release.get("artist-credit") or []
+        artist                  =   [artist.get("artist", {}).get("name") for artist in artist_credit if isinstance(artist, dict)]
         # album
-        release_group   =   release.get("release-group") or {}
-        title           =   release_group.get("title", "")
-        date            =   release_group.get("first-release-date", "")
-        tags_list       =   release_group.get("tag-list") or []
-        tag_names       =   [tag.get("name") for tag in tags_list]
-        genres, tags    =   self.tags.genres_tags(tag_names)
-        decade          =   self.tags.get_decade(date)
+        release_group           =   release.get("release-group") or {}
+        title                   =   release_group.get("title", "")
+        date                    =   release_group.get("first-release-date", "")
+        tags_list               =   release_group.get("tag-list") or []
+        tag_names               =   [tag.get("name") for tag in tags_list]
+        genres, parents, tags   =   self.tags.genres_parents_tags(tag_names)
+        decade                  =   self.tags.get_decade(date)
         if decade is not None:
             tags.append(decade)
 
@@ -151,6 +160,7 @@ class MusicBrainz(Library):
                 "artist": artist,
                 "date": date,
                 "genres": list(set(genres)),
+                "parents": list(set(parents)),
                 "tags": tags,
                 "source": self.platform
                 }

@@ -100,17 +100,30 @@ class Tags:
         else:
             return None 
 
-    def genres_tags(self, tag_names: list[Any]) -> tuple[list[str], list[str]]:
-        genres, tags = [], []
+    def genres_parents_tags(self, tag_names: list[Any]) -> tuple[list[str], list[str], list[str]]:
+        """
+        Separate tag names into genres, parent genres, and other tags.
+        
+        :param self: Instance of the Tags class.
+        :param tag_names: List of tag names to be categorized.
+        :type tag_names: list[Any]
+        :return: A tuple containing three lists: genres, parent genres, and other tags.
+        :rtype: tuple[list[str], list[str], list[str]]
+        """
+        library_parents = set(self._get_parents_children().keys())
+        genres, parents, tags = [], [], []
         for tag_name in tag_names:
             normalized = self._normalize_tag(tag_name)
             if normalized is None:
                 continue
-            if normalized in self.canonical_genres or normalized in self.aliases.values():
-                genres.append(normalized)
+            elif normalized in self.canonical_genres or normalized in self.aliases.values():
+                if normalized in library_parents:
+                    parents.append(normalized)
+                else:
+                    genres.append(normalized)
             else:
                 tags.append(normalized)
-        return genres, tags
+        return genres, parents, tags
 
 
     def edit_repo_genre(self, canonical_genre: str, alias: str | None = None, parent: str | list[str] | None = None) -> None:
@@ -131,6 +144,13 @@ class Tags:
         self.canonical_genres, self.aliases, self.parents   =   canonical_genres, aliases, parents
 
     def _get_parents_children(self) -> dict[str, list[str]]:
+        """
+        Get a mapping of parent genres to their child genres.
+        
+        :param self: Instance of the Tags class.
+        :return: A dictionary mapping parent genres to lists of their child genres.
+        :rtype: dict[str, list[str]]
+        """
         parents_children = {}
         for genre in self.canonical_genres:
             parents = self.parents.get(genre, [])
