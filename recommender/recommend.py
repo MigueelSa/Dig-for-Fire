@@ -1,8 +1,7 @@
 import logging
 import os, json, random
 import numpy as np
-from scipy.sparse import csr_matrix
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import normalize
 import musicbrainzngs as mb
@@ -17,10 +16,10 @@ from utils.paths import output_path
 
 class Recommender:
 
-    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.3):
+    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.6):
         self.mb_library                                                                     =   MusicBrainz(app_name, app_version, email)
         self.library                                                                        =   self._load_library(library_path)
-        self.genre_space_matrix, self.parent_space_matrix, self.tag_space_matrix            =   self._space_matrix(self.library)
+        self.library_embeddings                                                             =   self._load_embeddings()
         self.taste_gv, self.taste_pv, self.taste_tv                                         =   self._taste_vectors()
         self.app_name, self.app_version, self.email, self.k, self.limit, self.threshold     =   app_name, app_version, email, k, limit, threshold   
         self.used_tokens                                                                    =   set()
@@ -36,7 +35,7 @@ class Recommender:
                 fetched_albums = self._fetch_albums(random_tokens, limit)
                 if not fetched_albums:
                     continue
-                fetched_albums_gspace_matrix, fetched_albums_pspace_matrix, fetched_albums_tspace_matrix = self._space_matrix(fetched_albums, create_space=False)
+                fetched_albums_gspace_matrix, fetched_albums_pspace_matrix, fetched_albums_tspace_matrix = self._space_matrix(fetched_albums)
                 genre_similarity_projections = cosine_similarity(fetched_albums_gspace_matrix, self.taste_gv)
                 parent_similarity_projections = cosine_similarity(fetched_albums_pspace_matrix, self.taste_pv)
                 tag_similarity_projections = cosine_similarity(fetched_albums_tspace_matrix, self.taste_tv)
@@ -87,9 +86,18 @@ class Recommender:
             library = json.load(file)
         return library
 
-    def _album_genres_tags(self, album: AlbumData) -> tuple[list[str], list[str]]:
-        genres = list(album.get("genres", []))
-        tags = list(album.get("tags", []))
+    def _album_genres_parents_tags(self, album: AlbumData) -> tuple[list[str], list[str], list[str]]:
+        """
+        Extract genres, parent genres, and tags from an album.
+        
+        :param self: Instance of the Recommender class.
+        :param album: Album data.
+        :type album: AlbumData
+        :return: A tuple containing three lists: genres, parent genres, and tags.
+        :rtype: tuple[list[str], list[str], list[str]]
+        """
+        genres, parents, tags = list(album.get("genres", [])), list(album.get("parents", [])), list(album.get("tags", []))
+        """
         genre_set = set(genres)
         for genre in genres:
             parents = self.mb_library.tags.parents.get(genre) or []
@@ -97,34 +105,34 @@ class Recommender:
                 if parent in genre_set:
                     genre_set.remove(parent)
         filtered_genres = list(genre_set)
-        return filtered_genres, tags
-
-    def _library_genres_tags(self, library: LibraryData) -> tuple[list[str], list[str], list[str]]:
-        library_genres, parent_genres, library_tags = [], [], []
-        for album in library:
-            genres, tags = self._album_genres_tags(album)
-            library_genres.append(" ".join(genres))
-            library_tags.append(" ".join(tags))
-
-            parents = self._albums_parents(album)
-            parent_genres.append(" ".join(parents))
-
-        return library_genres, parent_genres, library_tags
-
-    def _space_matrix(self, library: LibraryData, create_space=True) -> tuple[csr_matrix, csr_matrix]:
-        library_genres, parent_genres, library_tags = self._library_genres_tags(library)
-        if create_space:
-            self.gvectorizer, self.pvectorizer, self.tvectorizer = TfidfVectorizer(lowercase=False, token_pattern=r"[^ ]+"), TfidfVectorizer(lowercase=False, token_pattern=r"[^ ]+"), TfidfVectorizer(lowercase=False, token_pattern=r"[^ ]+")
-            X, Y, Z = self.gvectorizer.fit_transform(library_genres), self.pvectorizer.fit_transform(parent_genres), self.tvectorizer.fit_transform(library_tags)
-        else:
-            X, Y, Z = self.gvectorizer.transform(library_genres), self.pvectorizer.transform(parent_genres), self.tvectorizer.transform(library_tags)
-        return X, Y, Z
+        """
+        return genres, parents, tags
+    
 
     def _taste_vectors(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        gv, pv, tv = self.genre_space_matrix.sum(axis=0), self.parent_space_matrix.sum(axis=0), self.tag_space_matrix.sum(axis=0)
-        gv, pv, tv = np.asarray(gv, dtype=float).reshape(1, -1), np.asarray(pv, dtype=float).reshape(1, -1), np.asarray(tv, dtype=float).reshape(1, -1)
-        gv, pv, tv = normalize(gv), normalize(pv), normalize(tv)
+        gv, pv, tv = None, None, None
+
+        for album in self.library:
+            album_genres, album_parents, album_tags = self._album_embeddings(album)
+
+            if album_genres.all():
+                gv_vec = album_genres
+                gv = gv_vec if gv is None else gv + gv_vec
+
+            if album_parents.all():
+                pv_vec = album_parents
+                pv = pv_vec if pv is None else pv + pv_vec
+
+            if album_tags.all():
+                tv_vec = album_tags
+                tv = tv_vec if tv is None else tv + tv_vec
+
+        gv = normalize(gv.reshape(1, -1)) if gv is not None else np.zeros((1, len(next(iter(self.library_embeddings.values())))))
+        pv = normalize(pv.reshape(1, -1)) if pv is not None else np.zeros((1, len(next(iter(self.library_embeddings.values())))))
+        tv = normalize(tv.reshape(1, -1)) if tv is not None else np.zeros((1, len(next(iter(self.library_embeddings.values())))))
+
         return gv, pv, tv
+
 
     def _pools(self) -> tuple[dict[str, int], dict[str, int], dict[str, list[str]], dict[str, int]]:
         all_genres, all_tags = [], []
@@ -257,9 +265,123 @@ class Recommender:
             genre_parents = self.mb_library.tags.parents.get(genre) or []
             parents.update(genre_parents)
         return list(parents)
+    
+    def _coocurrence_matrix(self) -> tuple[np.ndarray, set[str, int]]:
+        """
+        Compute the co-occurrence matrix for genres, parents, and tags in the library.
         
+        :param self: Instance of the Recommender class.
+        :param library: Library data.
+        :type library: LibraryData
+        :return: The co-occurrence matrix as a NumPy ndarray.
+        :rtype: ndarray[_AnyShape, dtype[Any]]
+        """
+        tokens = set()
+        for album in self.library:
+            genres, parents, tags = self._album_genres_parents_tags(album)
+            tokens.update(genres)
+            tokens.update(parents)
+            tokens.update(tags)
+        tokens = sorted(tokens)
 
+        token_index = {token: idx for idx, token in enumerate(tokens)}
+        n = len(tokens)
+        cooc_matrix = np.zeros((n, n), dtype=int)
 
+        for album in self.library:
+            genres, parents, tags = self._album_genres_parents_tags(album)
+            album_tokens = list(set(genres + parents + tags))
+            for i, token1 in enumerate(album_tokens):
+                idx1 = token_index[token1]
+                for token2 in album_tokens[i+1:]:
+                    idx2 = token_index[token2]
+                    cooc_matrix[idx1, idx2] += 1
+                    cooc_matrix[idx2, idx1] += 1
+
+        return cooc_matrix, token_index
+    
+    def _compute_embeddings(self) ->  dict[str, np.ndarray]:
+        """
+        Compute embeddings for each token in the library.
+        
+        :param self: Instance of the Recommender class.
+        :return: Dictionary mapping each token to its normalized vector.
+        """
+        
+        # The co-occurrence matrix can often be written in block-diagonal form. For each block, we compute eigenvalues and eigenvectors.
+        # Each eigenvector represents a direction in genre space, and the projection of all genre vectors onto that eigenvector is related to its eigenvalue.
+        # The eigenvector with the smallest eigenvalue (in absolute value) corresponds to the direction along which the projections of the genre vectors are smallest.
+        # Therefore, it contributes the least to representing similarities and can be discarded when reducing dimensionality.
+        # If we exclude self-occurrences (the diagonal), the eigenvectors capture only co-occurrence with *other* genres.
+        # Including the diagonal emphasizes each genre’s own frequency, which can dominate the largest eigenvector. Excluding it highlights relationships between genres.
+        coocurrence_matrix, token_index = self._coocurrence_matrix()
+        # Here, we will try to keep the same dimension so information is not lost.
+        n = coocurrence_matrix.shape[0]
+        svd = TruncatedSVD(n_components=n)
+        reduced_matrix = svd.fit_transform(coocurrence_matrix)
+        reduced_matrix = normalize(reduced_matrix)
+
+        token_embeddings = {token: reduced_matrix[idx] for token, idx in token_index.items()}
+
+        return token_embeddings
+    
+    def _save_embeddings(self, embeddings: dict[str, np.ndarray], save_dir = output_path("data")) -> None:
+        file_path = output_path(save_dir, "embeddings-Dig-for-Fire.npz")
+
+        tokens, vectors = np.array(list(embeddings.keys())), np.stack(list(embeddings.values()))
+
+        os.makedirs(save_dir, exist_ok=True)
+        np.savez_compressed(file_path, tokens=tokens, vectors=vectors)
+    
+    def _load_embeddings(self, save_dir=output_path("data")) -> dict[str, np.ndarray]:
+        file_name = "embeddings-Dig-for-Fire.npz"
+        file_path = output_path(save_dir, file_name)
+        if not os.path.exists(file_path):
+            embeddings = self._compute_embeddings()
+            self._save_embeddings(embeddings, save_dir=save_dir)
+            return embeddings
+        data = np.load(file_path)
+        tokens, vectors = data["tokens"], data["vectors"]
+
+        return {token: vectors[i] for i, token in enumerate(tokens)}
+    
+
+    def _album_embeddings(self, album: AlbumData) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        any_token = next(iter(self.library_embeddings))
+        vector_dim = self.library_embeddings[any_token].shape[0]
+        genres, parents, tags = self._album_genres_parents_tags(album)
+
+        zero_array = np.zeros(vector_dim, dtype=float)
+
+        album_genres = np.zeros(vector_dim, dtype=float)
+        for genre in genres:
+            album_genres += self.library_embeddings.get(genre, zero_array)
+
+        album_parents = np.zeros(vector_dim, dtype=float)
+        for parent in parents:
+            album_parents += self.library_embeddings.get(parent, zero_array)
+
+        album_tags = np.zeros(vector_dim, dtype=float)
+        for tag in tags:
+            album_tags += self.library_embeddings.get(tag, zero_array)
+
+        return album_genres, album_parents, album_tags
+    
+    def _space_matrix(self, library: LibraryData) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        gv_list, pv_list, tv_list = [], [], []
+        for album in library:
+            g, p, t = self._album_embeddings(album)
+            gv_list.append(g)
+            pv_list.append(p)
+            tv_list.append(t)
+
+        G = normalize(np.vstack(gv_list))
+        P = normalize(np.vstack(pv_list))
+        T = normalize(np.vstack(tv_list))
+
+        return G, P, T
+            
+    
 if __name__ == "__main__":
     import argparse, time
 
