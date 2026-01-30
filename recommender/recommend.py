@@ -7,6 +7,7 @@ import musicbrainzngs as mb
 import pandas as pd
 from tqdm import tqdm
 from collections import Counter
+from typing import Literal
 
 from models.models import LibraryData
 from libraries.libraries import MusicBrainz
@@ -16,11 +17,11 @@ from utils.albums import get_album_genres, get_album_tags
 
 class Recommender:
 
-    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.6):
+    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.6, method: Literal["cooc", "svd"] = "cooc", n: int | None = None):
         self.mb_library                                                                         =   MusicBrainz(app_name, app_version, email)
         self.library                                                                            =   self._load_library(library_path)
         self.roots                                                                              =   self.mb_library.tags.roots
-        self.embeddings                                                                         =   Embeddings(self.library)
+        self.embeddings                                                                         =   Embeddings(self.library, method, n)
         self.taste_gv, self.taste_tv                                                            =   self._taste_vectors()
         self.app_name, self.app_version, self.email, self.k, self.limit, self.threshold         =   app_name, app_version, email, k, limit, threshold   
         self.used_tokens                                                                        =   set()
@@ -91,17 +92,15 @@ class Recommender:
 
         for album in self.library:
             album_genres, album_tags = self.embeddings.get_album_embeddings(album, "genres"), self.embeddings.get_album_embeddings(album, "tags")
+            
+            gv_vec = album_genres
+            gv = gv_vec if gv is None else gv + gv_vec
+        
+            tv_vec = album_tags
+            tv = tv_vec if tv is None else tv + tv_vec
 
-            if album_genres.all():
-                gv_vec = album_genres
-                gv = gv_vec if gv is None else gv + gv_vec
-
-            if album_tags.all():
-                tv_vec = album_tags
-                tv = tv_vec if tv is None else tv + tv_vec
-
-        gv = normalize(gv.reshape(1, -1)) if gv is not None else np.zeros((1, len(next(iter(self.embeddings.library_embeddings.values())))))
-        tv = normalize(tv.reshape(1, -1)) if tv is not None else np.zeros((1, len(next(iter(self.embeddings.library_embeddings.values())))))
+        gv = normalize(gv.reshape(1, -1)) if gv is not None else np.zeros((1, len(next(iter(self.embeddings.dimension)))))
+        tv = normalize(tv.reshape(1, -1)) if tv is not None else np.zeros((1, len(next(iter(self.embeddings.dimension)))))
 
         return gv, tv
 
@@ -279,7 +278,7 @@ class Recommender:
             genre, tag = self.embeddings.get_album_embeddings(album, "genres"), self.embeddings.get_album_embeddings(album, "tags")
             g_list.append(genre)
             t_list.append(tag)
-        g_array, t_array = normalize(np.vstack(g_list)), normalize(np.vstack(t_list))
+        g_array, t_array = np.vstack(g_list), np.vstack(t_list)
         return g_array, t_array
 
     

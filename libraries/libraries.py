@@ -165,6 +165,7 @@ class MusicBrainz(Library):
                 }
 
         return album
+    
 
     def fetch_library(self, local_library_path: str, batch_size: int = 50, **kwargs) -> None:
         self.local_library = self._load_library(local_library_path)
@@ -181,8 +182,6 @@ class MusicBrainz(Library):
 
         self._fetch_library(batch_size=batch_size, **kwargs)
         self._save_library()
-
-
 
 
     def _fetch_library(self, batch_size: int = 50, **kwargs) -> None:

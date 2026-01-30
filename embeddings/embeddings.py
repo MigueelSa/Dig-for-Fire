@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import normalize
-import os
+import os, hashlib, json
 from typing import Literal
 
 from models.models import AlbumData, LibraryData
@@ -11,9 +11,14 @@ from tags.tags import Tags
 
 class Embeddings:
 
-    def __init__(self, library: LibraryData):
-        self.library_embeddings     =   self._load_embeddings(library)
-        self.tags                   =   Tags()
+    def __init__(self, library: LibraryData, method: Literal["cooc", "svd"], n: int | None = None, alpha: float = 2, tw = 6, tr = 6):
+        self.tags                       =   Tags()
+        if n is not None and method != "cooc":
+            self.dimension              =   n
+        else:
+            self.dimension              =   len(self._build_vocabulary(library))
+        self.library_embeddings         =   self._load_embeddings(library, method)
+        self.alpha, self.tw, self.tr    =   alpha, tw, tr
 
     def _coocurrence_matrix(self, library: LibraryData) -> tuple[np.ndarray, dict[str, int]]:
         """
@@ -25,20 +30,16 @@ class Embeddings:
         :return: The co-occurrence matrix as a NumPy ndarray.
         :rtype: ndarray[_AnyShape, dtype[Any]]
         """
-        tokens = set()
-        for album in library:
-            genres, tags = get_album_genres(album), get_album_tags(album)
-            tokens.update(genres)
-            tokens.update(tags)
-        tokens = sorted(tokens)
+        
+        tokens = self._build_vocabulary(library)
 
         token_index = {token: idx for idx, token in enumerate(tokens)}
         n = len(tokens)
         cooc_matrix = np.zeros((n, n), dtype=int)
 
         for album in library:
-            genres, tags = get_album_genres(album), get_album_tags(album)
-            album_tokens = list(set(genres + tags))
+            genres, tags = get_album_genres(album).keys(), get_album_tags(album).keys()
+            album_tokens = list(genres | tags)
             for i, token1 in enumerate(album_tokens):
                 idx1 = token_index[token1]
                 for token2 in album_tokens[i+1:]:
@@ -64,7 +65,7 @@ class Embeddings:
 
         return token_embeddings
     
-    def _compute_svd_embeddings(self, library: LibraryData, n: int | None = None) ->  dict[str, np.ndarray]:
+    def _compute_svd_embeddings(self, library: LibraryData) ->  dict[str, np.ndarray]:
         """
         Compute svd embeddings for each token in the library.
         
@@ -79,9 +80,7 @@ class Embeddings:
         # Including the diagonal emphasizes each genre’s own frequency, which can dominate the largest eigenvector. Excluding it highlights relationships between genres.
         coocurrence_matrix, token_index = self._coocurrence_matrix(library)
         # Here, we will try to keep the same dimension so information is not lost. This is the same as using the co-ocurrence matrix.
-        if n is None or n > coocurrence_matrix.shape[0]:
-            n = coocurrence_matrix.shape[0]
-        svd = TruncatedSVD(n_components=n)
+        svd = TruncatedSVD(n_components=self.dimension)
         reduced_matrix = svd.fit_transform(coocurrence_matrix)
         reduced_matrix = normalize(reduced_matrix)
 
@@ -89,39 +88,40 @@ class Embeddings:
 
         return token_embeddings
     
-    def _save_embeddings(self, embeddings: dict[str, np.ndarray], save_dir = output_path("data")) -> None:
-        file_path = output_path(save_dir, "embeddings-Dig-for-Fire.npz")
+    def _save_embeddings(self, embeddings: dict[str, np.ndarray], library: LibraryData, method: Literal["cooc", "svd"], save_dir = output_path("data")) -> None:
+        lib_hash = self._vocabulary_hash(library, method)
+        file_name = f"embeddings-{method}-{lib_hash}-{self.dimension}-Dig-for-Fire.npz"
+        file_path = output_path(save_dir, file_name)
 
         tokens, vectors = np.array(list(embeddings.keys())), np.stack(list(embeddings.values()))
 
         os.makedirs(save_dir, exist_ok=True)
         np.savez_compressed(file_path, tokens=tokens, vectors=vectors)
 
-    def _load_embeddings(self, library: LibraryData, save_dir=output_path("data")) -> dict[str, np.ndarray]:
-        file_name = "embeddings-Dig-for-Fire.npz"
+    def _load_embeddings(self, library: LibraryData, method: Literal["cooc", "svd"], save_dir=output_path("data")) -> dict[str, np.ndarray]:
+        lib_hash = self._vocabulary_hash(library, method)
+        file_name = f"embeddings-{method}-{lib_hash}-{self.dimension}-Dig-for-Fire.npz"
         file_path = output_path(save_dir, file_name)
         if not os.path.exists(file_path):
-            embeddings = self._compute_embeddings(library)
-            self._save_embeddings(embeddings, save_dir=save_dir)
+            embeddings = self._compute_embeddings(library, method=method)
+            self._save_embeddings(embeddings, library, method, save_dir=save_dir)
             return embeddings
         data = np.load(file_path)
         tokens, vectors = data["tokens"], data["vectors"]
 
         return {token: vectors[i] for i, token in enumerate(tokens)}
     
-    def get_album_embeddings(self, album: AlbumData, token_type: Literal["genres", "tags"], vector_dim: int | None = None, alpha: float = 2, tw = 6, tr = 6) -> np.ndarray:
-        if vector_dim is None:
-            any_token = next(iter(self.library_embeddings))
-            vector_dim = self.library_embeddings[any_token].shape[0]
+    def get_album_embeddings(self, album: AlbumData, token_type: Literal["genres", "tags"]) -> np.ndarray:
+        alpha = self.alpha
 
         if token_type == "genres":
             tokens = get_album_genres(album)
         elif token_type == "tags":
             tokens = get_album_tags(album)
-            alpha = alpha * tw
+            alpha = alpha * self.tw
 
-        zero_array = np.zeros(vector_dim, dtype=float)
-        album_tokens = np.zeros(vector_dim, dtype=float)
+        zero_array = np.zeros(self.dimension, dtype=float)
+        album_tokens = np.zeros(self.dimension, dtype=float)
         roots = self.tags.roots
         for token, distance in tokens.items():
             if token not in roots:
@@ -129,11 +129,35 @@ class Embeddings:
 
         if np.all(album_tokens == 0):
             for token, distance in tokens.items():
-                album_tokens += self.library_embeddings.get(token, zero_array) * np.exp(-alpha*distance*tr)
+                album_tokens += self.library_embeddings.get(token, zero_array) * np.exp(-alpha*distance*self.tr)
 
         if np.linalg.norm(album_tokens) > 0:
             album_tokens = album_tokens / np.linalg.norm(album_tokens)
 
         return album_tokens
+    
+    def _build_vocabulary(self, library: LibraryData) -> set[str]:
+        vocabulary = set()
+        for album in library:
+            album_genres, album_tags = get_album_genres(album).keys(), get_album_tags(album).keys()
+            vocabulary.update(album_genres | album_tags)
+
+        return sorted(vocabulary)
+    
+    def _vocabulary_hash(self, library: LibraryData, method: Literal["cooc", "svd"]) -> str:
+        library_data = [
+            {
+                "genres": list(get_album_genres(a).keys()),
+                "tags": list(get_album_tags(a).keys())
+            }
+            
+            for a in library
+        ]
+
+        payload = json.dumps({"library": library_data, "method": method}, sort_keys=True)
+        return hashlib.md5(payload.encode("utf-8")).hexdigest()
+    
+
+
 
     
