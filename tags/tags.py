@@ -8,6 +8,8 @@ class Tags:
     def __init__(self):
         self.repo_file                                      =   resource_path("tags", "MusicBrainz-genres_repo.json")
         self.canonical_genres, self.aliases, self.ancestors =   self._load_repo()
+        self.roots                                          =   self._roots()
+        self.ancestors_children                              =   self._get_ancestors_children()
         #self.skipped_genres: set[str]                       =   set()
 
 
@@ -54,20 +56,6 @@ class Tags:
                 else:
                     self.edit_repo_genre(genre, alias = genre)
 
-                """
-                canonical_genre_split, ancestors, has_ancestors = canonical_genre.split("_"), [], False
-                # this misses things like rock and rockabilly but avoids things rap and trap
-                if canonical_genre not in self.ancestors:
-                    for cg in canonical_genre_split:
-                        if cg in self.ancestors:
-                            ancestors.append(cg)
-                            has_ancestors = True
-                if has_ancestors:
-                    self.edit_repo_genre(canonical_genre, alias = canonical_genre, ancestor = ancestors)
-                else:
-                    self.edit_repo_genre(canonical_genre, alias = canonical_genre)
-                """
-
         self._save_repo()
 
     @lru_cache(maxsize=None)
@@ -111,9 +99,9 @@ class Tags:
         else:
             return None 
 
-    def genres_tags(self, tag_names: list[Any]) -> tuple[list[str], dict[str, int], list[str]]:
+    def genres_tags(self, tag_names: list[Any]) -> tuple[list[str], list[str]]:
         """
-        Separate tag names into genres, ancestor genres, and other tags,
+        Separate tag names into genres and other tags,
         and compute minimal distance of ancestors from genres.
         
         :param self: Instance of the Tags class.
@@ -179,6 +167,19 @@ class Tags:
                 if genre not in ancestors_children[a]:
                     ancestors_children[a].append(genre)
         return ancestors_children
+    
+    def _roots(self) -> set[str]:
+        """
+        Return the set of root genres in the library.
+
+        A root genre is defined as a genre that has no direct ancestors
+        in the `ancestors` mapping (its ancestor list is empty).
+
+        :return: Set of root genre names.
+        :rtype: set[str]
+        """
+        roots = set(genre for genre, ancestors in self.ancestors.items() if not ancestors)
+        return roots
 
 if __name__ == "__main__":
     genres = Tags()

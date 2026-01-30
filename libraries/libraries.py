@@ -48,7 +48,7 @@ class Library(ABC):
             library = json.load(f)
         return library
 
-    def _canonical_album(self, album: AlbumData) -> tuple[str, tuple[str], tuple[str] | None]:
+    def _canonical_album(self, album: AlbumData) -> tuple[str, tuple[str], str, str | None]:
             title = re.sub(r"\s+", " ", album["title"].lower().strip())
             title = re.sub(r"\(.*?\)|\[.*?\]|deluxe|remaster(ed)?", "", title)
             artist = tuple(sorted(re.sub(r"\s+", " ", a.lower().strip()) for a in album["artist"] if a))
