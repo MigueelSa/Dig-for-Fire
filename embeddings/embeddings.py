@@ -4,23 +4,23 @@ from sklearn.preprocessing import normalize
 import os, hashlib, json
 from typing import Literal
 
-from models.models import AlbumData, LibraryData
+from models.models import AlbumData, LibraryData, MethodType
 from utils.paths import output_path
 from utils.albums import get_album_genres, get_album_tags
 from tags.tags import Tags
 
 class Embeddings:
 
-    def __init__(self, library: LibraryData, method: Literal["cooc", "svd"], n: int | None = None, alpha: float = 1, tw: float = 6, rw: float = 6):
+    def __init__(self, library: LibraryData, method: MethodType, n: int | None = None, alpha: float = 1, tw: float = 6, rw: float = 6):
         self.tags                       =   Tags()
-        if n is not None and method != "cooc":
+        if n is not None and method == "svd":
             self.dimension              =   n
         else:
             self.dimension              =   len(self._build_vocabulary(library))
         self.library_embeddings         =   self._load_embeddings(library, method)
         self.alpha, self.tw, self.rw    =   alpha, tw, rw
 
-    def _coocurrence_matrix(self, library: LibraryData) -> tuple[np.ndarray, dict[str, int]]:
+    def _coocurrence_matrix(self, library: LibraryData, null_diagonal: bool = True) -> tuple[np.ndarray, dict[str, int]]:
         """
         Compute the co-occurrence matrix for genres, parents, and tags in the library.
         
@@ -37,25 +37,52 @@ class Embeddings:
         n = len(tokens)
         cooc_matrix = np.zeros((n, n), dtype=int)
 
+        if null_diagonal:
+            d = 1
+        else:
+            d = 0
+
         for album in library:
             genres, tags = get_album_genres(album).keys(), get_album_tags(album).keys()
             album_tokens = list(genres | tags)
             for i, token1 in enumerate(album_tokens):
                 idx1 = token_index[token1]
-                for token2 in album_tokens[i+1:]:
+                for token2 in album_tokens[i+d:]:
                     idx2 = token_index[token2]
                     cooc_matrix[idx1, idx2] += 1
                     cooc_matrix[idx2, idx1] += 1
 
         return cooc_matrix, token_index
     
-    def _compute_embeddings(self, library: LibraryData, method: Literal["cooc", "svd"] = "cooc") ->  dict[str, np.ndarray]:
+    def _compute_pmi_embeddings(self, library: LibraryData, ppmi: bool = False) -> dict[str, np.ndarray]:
+        coocurrence_matrix, token_index = self._coocurrence_matrix(library, null_diagonal=False)
+        pij = coocurrence_matrix.astype(np.float32)
+        total_albums = len(library)
+        eps = 1e-18
+
+        pij /= total_albums
+        pi, pj = np.diagonal(pij).reshape(-1,1), np.diagonal(pij).reshape(1,-1)
+
+        pmi_matrix = np.log(pij/(pi*pj) + eps)
+        if ppmi:
+            pmi_matrix = np.maximum(pmi_matrix, 0)
+        pmi_matrix = normalize(pmi_matrix)
+
+        return {token: pmi_matrix[idx] for token, idx in token_index.items()}
+
+
+    
+    def _compute_embeddings(self, library: LibraryData, method: MethodType = "ppmi") ->  dict[str, np.ndarray]:
         if method == "cooc":
             cooc_matrix, token_index = self._coocurrence_matrix(library)
             cooc_matrix = normalize(cooc_matrix)
             token_embeddings = {token: cooc_matrix[idx] for token, idx in token_index.items()}
         elif method == "svd":
             token_embeddings = self._compute_svd_embeddings(library)
+        elif method == "pmi":
+            token_embeddings = self._compute_pmi_embeddings(library)
+        elif method == "ppmi":
+            token_embeddings = self._compute_pmi_embeddings(library, ppmi=True)
         # elif method == "w2v": # more fit for larger libraries where we can profit from reducing dimension
             # The goal is that the probability of a context given a genre reflects the data.
             # For that, for each genre, two vectors of dimension d are randomly initialized, an input vector v and output vector u.
@@ -88,7 +115,7 @@ class Embeddings:
 
         return token_embeddings
     
-    def _save_embeddings(self, embeddings: dict[str, np.ndarray], library: LibraryData, method: Literal["cooc", "svd"], save_dir = output_path("data")) -> None:
+    def _save_embeddings(self, embeddings: dict[str, np.ndarray], library: LibraryData, method: MethodType, save_dir = output_path("data")) -> None:
         lib_hash = self._vocabulary_hash(library, method)
         file_name = f"embeddings-{method}-{lib_hash}-{self.dimension}-Dig-for-Fire.npz"
         file_path = output_path(save_dir, file_name)
@@ -98,7 +125,7 @@ class Embeddings:
         os.makedirs(save_dir, exist_ok=True)
         np.savez_compressed(file_path, tokens=tokens, vectors=vectors)
 
-    def _load_embeddings(self, library: LibraryData, method: Literal["cooc", "svd"], save_dir=output_path("data")) -> dict[str, np.ndarray]:
+    def _load_embeddings(self, library: LibraryData, method: MethodType, save_dir=output_path("data")) -> dict[str, np.ndarray]:
         lib_hash = self._vocabulary_hash(library, method)
         file_name = f"embeddings-{method}-{lib_hash}-{self.dimension}-Dig-for-Fire.npz"
         file_path = output_path(save_dir, file_name)

@@ -7,9 +7,8 @@ import musicbrainzngs as mb
 import pandas as pd
 from tqdm import tqdm
 from collections import Counter
-from typing import Literal
 
-from models.models import LibraryData
+from models.models import LibraryData, MethodType
 from libraries.libraries import MusicBrainz
 from utils.paths import output_path
 from embeddings.embeddings import Embeddings
@@ -17,7 +16,7 @@ from utils.albums import get_album_genres, get_album_tags
 
 class Recommender:
 
-    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.6, method: Literal["cooc", "svd"] = "cooc", n: int | None = None):
+    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.6, method: MethodType = "ppmi", n: int | None = None):
         self.mb_library                                                                         =   MusicBrainz(app_name, app_version, email)
         self.library                                                                            =   self._load_library(library_path)
         self.roots                                                                              =   self.mb_library.tags.roots
