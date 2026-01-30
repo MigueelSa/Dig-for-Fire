@@ -7,7 +7,9 @@ class Tags:
 
     def __init__(self):
         self.repo_file                                      =   resource_path("tags", "MusicBrainz-genres_repo.json")
-        self.canonical_genres, self.aliases, self.parents   =   self._load_repo()
+        self.canonical_genres, self.aliases, self.ancestors =   self._load_repo()
+        self.roots                                          =   self._roots()
+        self.ancestors_children                              =   self._get_ancestors_children()
         #self.skipped_genres: set[str]                       =   set()
 
 
@@ -17,13 +19,13 @@ class Tags:
                 data = json.load(f)
         else:
             data = {}
-        return set(data.get("canonical_genres", [])), data.get("aliases", {}), data.get("parents", {})
+        return set(data.get("canonical_genres", [])), data.get("aliases", {}), data.get("ancestors", {})
 
     def _save_repo(self) -> None:
         data = {
             "canonical_genres": list(self.canonical_genres),
             "aliases": self.aliases,
-            "parents": self.parents
+            "ancestors": self.ancestors
         }
         with open(self.repo_file, "w") as f:
             json.dump(data, f, indent=4)
@@ -32,7 +34,7 @@ class Tags:
         txt = os.path.abspath(genre_repo_txt_file)
         if not os.path.exists(txt):
             return
-
+        genres = set()
         with open(txt, "r") as t:
             for line in t:
                 line = line.strip()
@@ -45,17 +47,14 @@ class Tags:
                     canonical_genre, description = line, None
 
                 canonical_genre = self._normalize_tag(canonical_genre)
-                canonical_genre_split, parents, has_parents = canonical_genre.split("_"), [], False
-                # this misses things like rock and rockabilly but avoids things rap and trap
-                if canonical_genre not in self.parents:
-                    for cg in canonical_genre_split:
-                        if cg in self.parents:
-                            parents.append(cg)
-                            has_parents = True
-                if has_parents:
-                    self.edit_repo_genre(canonical_genre, alias = canonical_genre, parent = parents)
+                genres.add(canonical_genre)
+
+        for genre in genres:
+                ancestors = {a for a in genres if "_" + a + "_" in genre or genre.startswith(a + "_") or genre.endswith("_" + a)}
+                if ancestors:
+                    self.edit_repo_genre(genre, alias = genre, ancestor = list(ancestors))
                 else:
-                    self.edit_repo_genre(canonical_genre, alias = canonical_genre)
+                    self.edit_repo_genre(genre, alias = genre)
 
         self._save_repo()
 
@@ -100,69 +99,99 @@ class Tags:
         else:
             return None 
 
-    def genres_parents_tags(self, tag_names: list[Any]) -> tuple[list[str], list[str], list[str]]:
+    def genres_tags(self, tag_names: list[Any]) -> tuple[list[str], list[str]]:
         """
-        Separate tag names into genres, parent genres, and other tags.
+        Separate tag names into genres and other tags,
+        and compute minimal distance of ancestors from genres.
         
         :param self: Instance of the Tags class.
         :param tag_names: List of tag names to be categorized.
         :type tag_names: list[Any]
-        :return: A tuple containing three lists: genres, parent genres, and other tags.
-        :rtype: tuple[list[str], list[str], list[str]]
+        :return: A tuple containing three lists: genres, ancestor genres, and other tags.
+        :rtype: tuple[list[str], dict[str, int], list[str]]
         """
-        library_parents = set(self._get_parents_children().keys())
-        genres, parents, tags = [], [], []
+
+        distance_dict, tags = {}, set()
         for tag_name in tag_names:
             normalized = self._normalize_tag(tag_name)
             if normalized is None:
                 continue
             elif normalized in self.canonical_genres or normalized in self.aliases.values():
-                if normalized in library_parents:
-                    parents.append(normalized)
-                else:
-                    genres.append(normalized)
+                    distance_dict[normalized] = 0
             else:
-                tags.append(normalized)
-        return genres, parents, tags
+                tags.add(normalized)
 
 
-    def edit_repo_genre(self, canonical_genre: str, alias: str | None = None, parent: str | list[str] | None = None) -> None:
-        canonical_genres, aliases, parents   =   self.canonical_genres, self.aliases, self.parents
+        stack = list(distance_dict.keys())
+        while stack:
+            current = stack.pop()
+            for a in self.ancestors.get(current, []):
+                new_distance = distance_dict[current] + 1
+                if a not in distance_dict or new_distance < distance_dict[a]:
+                    distance_dict[a] = new_distance
+                    stack.append(a)
+
+        return distance_dict, list(tags)
+
+
+    def edit_repo_genre(self, canonical_genre: str, alias: str | None = None, ancestor: str | list[str] | None = None) -> None:
+        canonical_genres, aliases, ancestors   =   self.canonical_genres, self.aliases, self.ancestors
         
         if canonical_genre not in canonical_genres:
             canonical_genres.add(canonical_genre)
         if alias is not None:
             aliases[alias] = canonical_genre
-        if parent is not None:
-            if isinstance(parent, str):
-                parent = [parent]
-            parents.setdefault(canonical_genre, [])
-            for p in parent:
-                if p not in parents[canonical_genre]:
-                    parents[canonical_genre].append(p)
+        if ancestor is not None:
+            if isinstance(ancestor, str):
+                ancestor = [ancestor]
+            ancestors.setdefault(canonical_genre, [])
+            for a in ancestor:
+                if a not in ancestors[canonical_genre]:
+                    ancestors[canonical_genre].append(a)
 
-        self.canonical_genres, self.aliases, self.parents   =   canonical_genres, aliases, parents
+        self.canonical_genres, self.aliases, self.ancestors   =   canonical_genres, aliases, ancestors
 
-    def _get_parents_children(self) -> dict[str, list[str]]:
+    def _get_ancestors_children(self) -> dict[str, list[str]]:
         """
-        Get a mapping of parent genres to their child genres.
+        Get a mapping of ancestor genres to their child genres.
         
         :param self: Instance of the Tags class.
-        :return: A dictionary mapping parent genres to lists of their child genres.
+        :return: A dictionary mapping ancestor genres to lists of their child genres.
         :rtype: dict[str, list[str]]
         """
-        parents_children = {}
+        ancestors_children = {}
         for genre in self.canonical_genres:
-            parents = self.parents.get(genre, [])
-            for p in parents:
-                parents_children.setdefault(p, [])
-                if genre not in parents_children[p]:
-                    parents_children[p].append(genre)
-        return parents_children
+            ancestors = self.ancestors.get(genre, [])
+            for a in ancestors:
+                ancestors_children.setdefault(a, [])
+                if genre not in ancestors_children[a]:
+                    ancestors_children[a].append(genre)
+        return ancestors_children
+    
+    def _roots(self) -> set[str]:
+        """
+        Return the set of root genres in the library.
+
+        A root genre is defined as a genre that has no direct ancestors
+        in the `ancestors` mapping (its ancestor list is empty).
+
+        :return: Set of root genre names.
+        :rtype: set[str]
+        """
+        roots = set(genre for genre, ancestors in self.ancestors.items() if not ancestors)
+        return roots
 
 if __name__ == "__main__":
     genres = Tags()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_txt = os.path.abspath(os.path.join(script_dir, "MusicBrainz-genres_repo.txt"))
-    #genres.build_repo_from_txt(repo_txt)
-    print(genres._get_parents_children())
+
+    # manual labor here
+    roots = ["rock", "punk", "blues", "classical", "electronic", "folk", "hip_hop", "jazz", "metal", "pop", "soul", "reggae"]
+    for root in roots:
+        root = genres._normalize_tag(root)
+        genres.edit_repo_genre(root, ancestor = [])
+    genres.edit_repo_genre("trap", ancestor = ["gangsta_rap", "hardcore_hip_hop", "electronic"])
+    genres.edit_repo_genre("progressive_rock", alias="prog_rock")
+
+    genres.build_repo_from_txt(repo_txt)

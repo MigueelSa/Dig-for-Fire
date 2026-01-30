@@ -48,7 +48,7 @@ class Library(ABC):
             library = json.load(f)
         return library
 
-    def _canonical_album(self, album: AlbumData) -> tuple[str, tuple[str], tuple[str] | None]:
+    def _canonical_album(self, album: AlbumData) -> tuple[str, tuple[str], str, str | None]:
             title = re.sub(r"\s+", " ", album["title"].lower().strip())
             title = re.sub(r"\(.*?\)|\[.*?\]|deluxe|remaster(ed)?", "", title)
             artist = tuple(sorted(re.sub(r"\s+", " ", a.lower().strip()) for a in album["artist"] if a))
@@ -70,7 +70,6 @@ class Spotify(Library):
 
         self.platform           =       "Spotify"
         self.limit              =       50
-        self.save_dir           =       save_dir
         self._fetch_library()
 
     def _feed_release(self, data: AlbumData) -> AlbumData:
@@ -149,7 +148,7 @@ class MusicBrainz(Library):
         date                    =   release_group.get("first-release-date", "")
         tags_list               =   release_group.get("tag-list") or []
         tag_names               =   [tag.get("name") for tag in tags_list]
-        genres, parents, tags   =   self.tags.genres_parents_tags(tag_names)
+        genres, tags            =   self.tags.genres_tags(tag_names)
         decade                  =   self.tags.get_decade(date)
         if decade is not None:
             tags.append(decade)
@@ -159,20 +158,18 @@ class MusicBrainz(Library):
                 "title": title,
                 "artist": artist,
                 "date": date,
-                "genres": list(set(genres)),
-                "parents": list(set(parents)),
+                "genres": genres, # distance_dict
                 "tags": tags,
                 "source": self.platform
                 }
 
         return album
+    
 
     def fetch_library(self, local_library_path: str, batch_size: int = 50, **kwargs) -> None:
         self.local_library = self._load_library(local_library_path)
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        save_dir = os.path.abspath(os.path.join(script_dir, "../data/"))
-        pickle_file = os.path.join(save_dir, f"{self.platform}-Dig-for-Fire.pkl")
+        pickle_file = os.path.join(self.save_dir, f"{self.platform}-Dig-for-Fire.pkl")
 
         if os.path.exists(pickle_file):
             with open(pickle_file, "rb") as f:
@@ -182,8 +179,6 @@ class MusicBrainz(Library):
 
         self._fetch_library(batch_size=batch_size, **kwargs)
         self._save_library()
-
-
 
 
     def _fetch_library(self, batch_size: int = 50, **kwargs) -> None:
