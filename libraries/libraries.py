@@ -70,7 +70,6 @@ class Spotify(Library):
 
         self.platform           =       "Spotify"
         self.limit              =       50
-        self.save_dir           =       save_dir
         self._fetch_library()
 
     def _feed_release(self, data: AlbumData) -> AlbumData:
@@ -170,9 +169,7 @@ class MusicBrainz(Library):
     def fetch_library(self, local_library_path: str, batch_size: int = 50, **kwargs) -> None:
         self.local_library = self._load_library(local_library_path)
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        save_dir = os.path.abspath(os.path.join(script_dir, "../data/"))
-        pickle_file = os.path.join(save_dir, f"{self.platform}-Dig-for-Fire.pkl")
+        pickle_file = os.path.join(self.save_dir, f"{self.platform}-Dig-for-Fire.pkl")
 
         if os.path.exists(pickle_file):
             with open(pickle_file, "rb") as f:

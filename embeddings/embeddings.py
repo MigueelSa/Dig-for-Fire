@@ -11,14 +11,14 @@ from tags.tags import Tags
 
 class Embeddings:
 
-    def __init__(self, library: LibraryData, method: Literal["cooc", "svd"], n: int | None = None, alpha: float = 2, tw = 6, tr = 6):
+    def __init__(self, library: LibraryData, method: Literal["cooc", "svd"], n: int | None = None, alpha: float = 1, tw: float = 6, rw: float = 6):
         self.tags                       =   Tags()
         if n is not None and method != "cooc":
             self.dimension              =   n
         else:
             self.dimension              =   len(self._build_vocabulary(library))
         self.library_embeddings         =   self._load_embeddings(library, method)
-        self.alpha, self.tw, self.tr    =   alpha, tw, tr
+        self.alpha, self.tw, self.rw    =   alpha, tw, rw
 
     def _coocurrence_matrix(self, library: LibraryData) -> tuple[np.ndarray, dict[str, int]]:
         """
@@ -126,10 +126,8 @@ class Embeddings:
         for token, distance in tokens.items():
             if token not in roots:
                 album_tokens += self.library_embeddings.get(token, zero_array) * np.exp(-alpha*distance)
-
-        if np.all(album_tokens == 0):
-            for token, distance in tokens.items():
-                album_tokens += self.library_embeddings.get(token, zero_array) * np.exp(-alpha*distance*self.tr)
+            else:
+                album_tokens += self.library_embeddings.get(token, zero_array) * np.exp(-alpha*distance*self.rw)
 
         if np.linalg.norm(album_tokens) > 0:
             album_tokens = album_tokens / np.linalg.norm(album_tokens)
