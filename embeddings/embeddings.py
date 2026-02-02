@@ -1,8 +1,10 @@
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import normalize
-import os, hashlib, json
+import os, hashlib, json, multiprocessing
 from typing import Literal
+import networkx as nx
+from node2vec import Node2Vec
 
 from models.models import AlbumData, LibraryData, MethodType
 from utils.paths import output_path
@@ -20,7 +22,7 @@ class Embeddings:
             self.dimension              =   len(self.vocabulary)
         self.library_embeddings         =   self._load_embeddings(library, method)
         if smooth:
-            self.library_embeddings     =   self._smooth_by_coocurrence(self.library_embeddings, library, gamma=gamma, beta=beta)
+            self.library_embeddings     =   self._smooth(self.library_embeddings, library, gamma=gamma, beta=beta)
         self.alpha, self.tw, self.rw    =   alpha, tw, rw
 
     def _coocurrence_matrix(self, library: LibraryData, null_diagonal: bool = True) -> tuple[np.ndarray, dict[str, int]]:
@@ -276,3 +278,44 @@ class Embeddings:
         return smoothed_vectors
 
         """
+
+    def _smooth_by_node2vec(self, embeddings: dict[str, np.ndarray],gamma: float = 0.2,
+        n2v_dim: int | None = None,
+        n2v_walk_length: int = 30,
+        n2v_num_walks: int = 100,
+        n2v_window: int = 10,
+        n2v_p: float = 1,
+        n2v_q: float = 1,
+        n2v_weight: float = 0.5) -> dict[str, np.ndarray]:
+        
+        G = nx.Graph()
+        for genre in self.tags.canonical_genres:
+            G.add_node(genre)
+            for ancestor in self.tags.ancestors.get(genre, []):
+                G.add_edge(genre, ancestor)
+
+
+        if n2v_dim is None:
+            n2v_dim = self.dimension
+
+        workers = max(1, multiprocessing.cpu_count() - 1)
+        n2v_walk_length = min(n2v_walk_length, len(G.nodes) // 2)
+        node2vec = Node2Vec(G, dimensions=n2v_dim, walk_length=n2v_walk_length, num_walks=n2v_num_walks, p=n2v_p, q=n2v_q, workers=workers, seed = 1, quiet = True)
+        n2v_model = node2vec.fit(window=n2v_window, min_count=1, seed = 1)
+
+        genre_vectors = self._initialize_genre_embeddings(embeddings, gamma=gamma)
+        for genre in genre_vectors:
+            if genre in n2v_model.wv:
+                n2v_vec = n2v_model.wv[genre]
+                merged_vec = (1 - n2v_weight) * genre_vectors[genre] + n2v_weight * n2v_vec
+            else:
+                merged_vec = genre_vectors[genre]        
+            genre_vectors[genre] = normalize(merged_vec.reshape(1,-1))[0]
+
+        return genre_vectors
+    
+    def _smooth(self, embeddings: dict[str, np.ndarray], library: LibraryData, smooth_type: Literal["cooc", "n2v"] = "n2v", gamma: float = 0.2, beta: float = 0.1) -> dict[str, np.ndarray]:
+        if smooth_type == "cooc":
+            return self._smooth_by_coocurrence(embeddings, library, gamma=gamma, beta=beta)
+        elif smooth_type == "n2v":
+            return self._smooth_by_node2vec(embeddings, gamma=gamma)
