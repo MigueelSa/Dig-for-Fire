@@ -11,13 +11,16 @@ from tags.tags import Tags
 
 class Embeddings:
 
-    def __init__(self, library: LibraryData, method: MethodType, n: int | None = None, alpha: float = 1, tw: float = 6, rw: float = 6):
+    def __init__(self, library: LibraryData, method: MethodType, n: int | None = None, alpha: float = 1, tw: float = 6, rw: float = 6, smooth: bool = True, gamma: float = 0.2, beta: float = 0.1):
         self.tags                       =   Tags()
+        self.vocabulary                 =   self._build_vocabulary(library)
         if n is not None and method == "svd":
             self.dimension              =   n
         else:
-            self.dimension              =   len(self._build_vocabulary(library))
+            self.dimension              =   len(self.vocabulary)
         self.library_embeddings         =   self._load_embeddings(library, method)
+        if smooth:
+            self.library_embeddings     =   self._smooth_by_coocurrence(self.library_embeddings, library, gamma=gamma, beta=beta)
         self.alpha, self.tw, self.rw    =   alpha, tw, rw
 
     def _coocurrence_matrix(self, library: LibraryData, null_diagonal: bool = True) -> tuple[np.ndarray, dict[str, int]]:
@@ -31,7 +34,7 @@ class Embeddings:
         :rtype: ndarray[_AnyShape, dtype[Any]]
         """
         
-        tokens = self._build_vocabulary(library)
+        tokens = self.vocabulary
 
         token_index = {token: idx for idx, token in enumerate(tokens)}
         n = len(tokens)
@@ -169,7 +172,7 @@ class Embeddings:
 
         return sorted(vocabulary)
     
-    def _vocabulary_hash(self, library: LibraryData, method: Literal["cooc", "svd"]) -> str:
+    def _vocabulary_hash(self, library: LibraryData, method: MethodType) -> str:
         library_data = [
             {
                 "genres": list(get_album_genres(a).keys()),
@@ -182,7 +185,94 @@ class Embeddings:
         payload = json.dumps({"library": library_data, "method": method}, sort_keys=True)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
     
+    def _initialize_genre_embeddings(self, embeddings: dict[str, np.ndarray], gamma: float = 0.2) -> dict[str, np.ndarray]:
+        genre_vectors = {g: v.copy() for g, v in embeddings.items()}
 
+        new_vectors = {}
+        for genre in self.tags.canonical_genres:
+            if genre not in self.vocabulary:
+                continue
+            ancestors = self.tags.ancestors.get(genre, [])
+            ancestor_vecs = np.sum([genre_vectors[ancestor] for ancestor in ancestors], axis=0)
+            if ancestors:
+                vec = (1-gamma) * genre_vectors[genre] + gamma * ancestor_vecs
+                new_vectors[genre] = normalize(vec.reshape(1,-1))[0]
+            else:
+                new_vectors[genre] = genre_vectors[genre]
 
-
+        return new_vectors
     
+    def _smooth_by_coocurrence(self, embeddings: dict[str, np.ndarray], library: LibraryData, gamma: float = 0.2, beta: float = 0.1) -> dict[str, np.ndarray]:
+        genre_vectors = self._initialize_genre_embeddings(embeddings, gamma = gamma)
+        cooc_matrix, token_index = self._coocurrence_matrix(library)
+        cooc_weights = cooc_matrix.astype(float)
+        cooc_weights /= cooc_weights.sum(axis=1, keepdims=True) + 1e-18
+        
+        smoothed_vectors = {}
+        for genre in genre_vectors:
+            if genre not in token_index:
+                smoothed_vectors[genre] = genre_vectors[genre]
+                continue
+            idx = token_index[genre]
+            neighbor_mean = np.sum([cooc_weights[idx, j] * genre_vectors[token] for token, j in token_index.items() if token in self.tags.canonical_genres], axis=0)
+                    
+            if np.linalg.norm(neighbor_mean) > 0:
+                vec = (1 - beta) * genre_vectors[genre] + beta * neighbor_mean
+                smoothed_vectors[genre] = normalize(vec.reshape(1,-1))[0]
+            else:
+                smoothed_vectors[genre] = genre_vectors[genre]
+
+        return smoothed_vectors
+    
+    """
+    
+    def _initialize_genre_embeddings(self, embeddings: dict[str, np.ndarray], gamma: float = 0.2) -> dict[str, np.ndarray]:
+        genre_vectors = {g: v.copy() for g, v in embeddings.items()}
+
+        new_vectors = {}
+        for genre in self.tags.canonical_genres:
+            ancestor_vecs = np.zeros(self.dimension)
+            distance_dict, _ = self.tags.genres_tags([genre])
+            ancestors = self.tags.ancestors.get(genre, [])
+            weights = 0
+            for ancestor in ancestors:
+                distance = distance_dict[ancestor]
+                weight = np.exp(-self.alpha * distance * (self.rw if ancestor in self.tags.roots else 1))
+                ancestor_vecs += genre_vectors[ancestor]*weight
+                weights += weight
+            if weights > 0:
+                ancestor_vecs /= weights
+            if ancestors:
+                new_vectors[genre] = normalize((1-gamma) * genre_vectors[genre] + gamma * ancestor_vecs)
+            else:
+                new_vectors[genre] = genre_vectors[genre]
+
+        return new_vectors
+    
+    def _smooth_by_coocurrence(self, embeddings: dict[str, np.ndarray], library: LibraryData, gamma: float = 0.2, beta: float = 0.1) -> dict[str, np.ndarray]:
+        genre_vectors = self._initialize_genre_embeddings(embeddings, gamma = gamma)
+        cooc_matrix, token_index = self._coocurrence_matrix(library)
+        cooc_weights = cooc_matrix.astype(float)
+        cooc_weights /= cooc_weights.sum(axis=1, keepdims=True) + 1e-18
+        
+        smoothed_vectors = {}
+        for genre in genre_vectors:
+            distance_dict, _ = self.tags.genres_tags([genre])
+            if genre not in token_index:
+                smoothed_vectors[genre] = genre_vectors[genre]
+                continue
+            idx = token_index[genre]
+            neighbor_mean = np.zeros(self.dimension)
+            for token, j in token_index.items():
+                distance = distance_dict.get(token, 1.0)
+                weight = np.exp(-self.alpha * distance * (self.rw if token in self.tags.roots else 1))
+                neighbor_mean += cooc_weights[idx, j] * weight * genre_vectors[token]
+                    
+            if np.linalg.norm(neighbor_mean) > 0:
+                smoothed_vectors[genre] = normalize((1 - beta) * genre_vectors[genre] + beta * neighbor_mean)
+            else:
+                smoothed_vectors[genre] = genre_vectors[genre]
+
+        return smoothed_vectors
+
+        """

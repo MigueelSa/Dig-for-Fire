@@ -107,8 +107,8 @@ class Tags:
         :param self: Instance of the Tags class.
         :param tag_names: List of tag names to be categorized.
         :type tag_names: list[Any]
-        :return: A tuple containing three lists: genres, ancestor genres, and other tags.
-        :rtype: tuple[list[str], dict[str, int], list[str]]
+        :return: A tuple containing two lists: genres, and other tags.
+        :rtype: tuple[list[str], list[str]]
         """
 
         distance_dict, tags = {}, set()
