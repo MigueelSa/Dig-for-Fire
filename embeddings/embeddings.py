@@ -5,10 +5,12 @@ import os, hashlib, json, multiprocessing
 from typing import Literal
 import networkx as nx
 from node2vec import Node2Vec
+import tqdm as tqdm
 
 from models.models import AlbumData, LibraryData, MethodType
 from utils.paths import output_path
 from utils.albums import get_album_genres, get_album_tags
+from utils.loading import loading_animation
 from tags.tags import Tags
 
 class Embeddings:
@@ -279,7 +281,7 @@ class Embeddings:
 
         """
 
-    def _smooth_by_node2vec(self, embeddings: dict[str, np.ndarray],gamma: float = 0.2,
+    def _smooth_by_node2vec(self, embeddings: dict[str, np.ndarray], library: LibraryData,gamma: float = 0.2,
         n2v_dim: int | None = None,
         n2v_walk_length: int = 30,
         n2v_num_walks: int = 100,
@@ -292,16 +294,27 @@ class Embeddings:
         for genre in self.tags.canonical_genres:
             G.add_node(genre)
             for ancestor in self.tags.ancestors.get(genre, []):
-                G.add_edge(genre, ancestor)
+                G.add_edge(genre, ancestor, weight=1.0)
 
+        cooc_matrix, token_index = self._coocurrence_matrix(library)
+        for g1, idx1 in token_index.items():
+            for g2, idx2 in token_index.items():
+                if g1 != g2 and cooc_matrix[idx1, idx2] > 0:
+                    weight = cooc_matrix[idx1, idx2]
+                    if G.has_edge(g1, g2):
+                        G[g1][g2]['weight'] += weight
+                    else:
+                        G.add_edge(g1, g2, weight=weight)
 
         if n2v_dim is None:
             n2v_dim = self.dimension
 
+        stop = loading_animation("Smoothing embeddings with Node2Vec...")
         workers = max(1, multiprocessing.cpu_count() - 1)
         n2v_walk_length = min(n2v_walk_length, len(G.nodes) // 2)
-        node2vec = Node2Vec(G, dimensions=n2v_dim, walk_length=n2v_walk_length, num_walks=n2v_num_walks, p=n2v_p, q=n2v_q, workers=workers, seed = 1, quiet = True)
+        node2vec = Node2Vec(G, dimensions=n2v_dim, walk_length=n2v_walk_length, num_walks=n2v_num_walks, p=n2v_p, q=n2v_q, weight_key = "weight",workers=workers, seed = 1, quiet = True)
         n2v_model = node2vec.fit(window=n2v_window, min_count=1, seed = 1)
+        stop()
 
         genre_vectors = self._initialize_genre_embeddings(embeddings, gamma=gamma)
         for genre in genre_vectors:
@@ -318,4 +331,4 @@ class Embeddings:
         if smooth_type == "cooc":
             return self._smooth_by_coocurrence(embeddings, library, gamma=gamma, beta=beta)
         elif smooth_type == "n2v":
-            return self._smooth_by_node2vec(embeddings, gamma=gamma)
+            return self._smooth_by_node2vec(embeddings, library, gamma=gamma)

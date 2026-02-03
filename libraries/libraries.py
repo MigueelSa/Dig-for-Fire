@@ -137,13 +137,13 @@ class MusicBrainz(Library):
         :rtype: AlbumData
         """
         # release
-        release                 =   data.get("release", {})   
-        release_id              =   release.get("id")
+        release                 =   data.get("release", {})
         # artist
         artist_credit           =   release.get("artist-credit") or []
         artist                  =   [artist.get("artist", {}).get("name") for artist in artist_credit if isinstance(artist, dict)]
         # album
         release_group           =   release.get("release-group") or {}
+        release_id              =   release_group.get("id", "")
         title                   =   release_group.get("title", "")
         date                    =   release_group.get("first-release-date", "")
         tags_list               =   release_group.get("tag-list") or []
