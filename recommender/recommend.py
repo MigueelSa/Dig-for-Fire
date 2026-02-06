@@ -11,16 +11,18 @@ from collections import Counter
 from models.models import LibraryData, MethodType
 from libraries.libraries import MusicBrainz
 from utils.paths import output_path
-from embeddings.embeddings import Embeddings
+from embeddings.genre_space import GenreSpace
+from embeddings.tag_space import TagSpace
 from utils.albums import get_album_genres, get_album_tags
 
 class Recommender:
 
-    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.6, method: MethodType = "ppmi", n: int | None = None):
+    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.6, 
+                 method: MethodType = "pmi", n_clusters: int = 50):
         self.mb_library                                                                         =   MusicBrainz(app_name, app_version, email)
         self.library                                                                            =   self._load_library(library_path)
         self.roots                                                                              =   self.mb_library.tags.roots
-        self.embeddings                                                                         =   Embeddings(self.library, method, n)
+        self.genre_embeddings, self.tag_embeddings                                              =   GenreSpace(self.library, method=method), TagSpace(self.library, n_clusters=n_clusters)
         self.taste_gv, self.taste_tv                                                            =   self._taste_vectors()
         self.app_name, self.app_version, self.email, self.k, self.limit, self.threshold         =   app_name, app_version, email, k, limit, threshold   
         self.used_tokens                                                                        =   set()
@@ -65,7 +67,7 @@ class Recommender:
                 top_albums.append(album_dict)
         return top_albums[:k]
 
-    def _similarity_scores(self, genre_similarity_projections: np.ndarray, tag_similarity_projections: np.ndarray, genre_weight: float = 0.85) -> np.ndarray:
+    def _similarity_scores(self, genre_similarity_projections: np.ndarray, tag_similarity_projections: np.ndarray, genre_weight: float = 0.6) -> np.ndarray:
         tag_weight = 1.0 - genre_weight
         genre_scores = genre_similarity_projections.flatten()
         tag_scores = tag_similarity_projections.flatten()
@@ -90,7 +92,7 @@ class Recommender:
         gv, tv = None, None
 
         for album in self.library:
-            album_genres, album_tags = self.embeddings.get_album_embeddings(album, "genres"), self.embeddings.get_album_embeddings(album, "tags")
+            album_genres, album_tags = self.genre_embeddings.get_album_embeddings(album), self.tag_embeddings.get_album_embeddings(album)
             
             gv_vec = album_genres
             gv = gv_vec if gv is None else gv + gv_vec
@@ -98,8 +100,8 @@ class Recommender:
             tv_vec = album_tags
             tv = tv_vec if tv is None else tv + tv_vec
 
-        gv = normalize(gv.reshape(1, -1)) if gv is not None else np.zeros((1, len(next(iter(self.embeddings.dimension)))))
-        tv = normalize(tv.reshape(1, -1)) if tv is not None else np.zeros((1, len(next(iter(self.embeddings.dimension)))))
+        gv = normalize(gv.reshape(1, -1)) if gv is not None else np.zeros((1, len(next(iter(self.genre_embeddings.dimension)))))
+        tv = normalize(tv.reshape(1, -1)) if tv is not None else np.zeros((1, len(next(iter(self.tag_embeddings.dimension)))))
 
         return gv, tv
 
@@ -260,21 +262,11 @@ class Recommender:
             album_id = self.mb_library._canonical_album(album)
             excluded.add(album_id)
         return excluded
-
-    """
-    def _albums_parents(self, album: AlbumData) -> list[str]:
-        genres, _ = self._album_genres_tags(album)
-        parents = set()
-        for genre in genres.keys():
-            genre_parents = self.mb_library.tags.parents.get(genre) or []
-            parents.update(genre_parents)
-        return list(parents)
-    """
     
     def _space_matrix(self, library: LibraryData) -> tuple[np.ndarray, np.ndarray]:
         g_list, t_list = [], []
         for album in library:
-            genre, tag = self.embeddings.get_album_embeddings(album, "genres"), self.embeddings.get_album_embeddings(album, "tags")
+            genre, tag = self.genre_embeddings.get_album_embeddings(album), self.tag_embeddings.get_album_embeddings(album)
             g_list.append(genre)
             t_list.append(tag)
         g_array, t_array = np.vstack(g_list), np.vstack(t_list)

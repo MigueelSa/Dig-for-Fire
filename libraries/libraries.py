@@ -149,9 +149,9 @@ class MusicBrainz(Library):
         tags_list               =   release_group.get("tag-list") or []
         tag_names               =   [tag.get("name") for tag in tags_list]
         genres, tags            =   self.tags.genres_tags(tag_names)
-        decade                  =   self.tags.get_decade(date)
-        if decade is not None:
-            tags.append(decade)
+        #decade                  =   self.tags.get_decade(date)
+        #if decade is not None:
+        #    tags.append(decade)
 
         album = {
                 "id": release_id,
