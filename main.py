@@ -1,4 +1,5 @@
 import argparse, logging, os
+import sys
 from libraries.libraries import MusicBrainz
 from recommender.recommend import Recommender
 from utils.paths import output_path
@@ -24,6 +25,8 @@ def main():
 
     rec = Recommender(json_path, email)
     recommendations = rec.recommend()
+    sys.stdout.write('\r' + ' ' * 80 + '\r')
+    sys.stdout.flush()
     print(recommendations)
 
 if __name__ == "__main__":

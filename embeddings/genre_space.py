@@ -16,9 +16,8 @@ from scipy.sparse import coo_matrix
 
 class GenreSpace(Embeddings):
     def __init__(self, library: LibraryData, method: MethodType = "pmi"):
-        super().__init__(library)
-        self.token_type: TokenType                      =   "genre"
-        self.method: MethodType                         =   method
+        super().__init__(library, token_type="genre", method=method)
+
         self.vocabulary: list[str]                      =   self._build_vocabulary()
         self.dimension: int                             =   len(self.vocabulary)
         self.library_embeddings: EmbeddingData          =   self._load_embeddings(self.dimension)

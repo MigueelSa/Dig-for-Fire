@@ -19,14 +19,12 @@ disable_progress_bar()
 
 class TagSpace(Embeddings):
     def __init__(self, library: LibraryData, n_clusters: int = 50):
-        super().__init__(library)
+        super().__init__(library, token_type="tag", method="tag_clusters")
 
         stop = loading_animation("Initializing SentenceTransformer model...")
         self.model                              =   SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cpu")
         stop()
-
-        self.token_type: TokenType              =   "tag"
-        self.method: MethodType                 =   "tag_clusters"
+        
         self.library_mood_tag_embeddings        =   self._library_mood_tag_embeddings(n_clusters=n_clusters)
         self.vocabulary                         =   self._build_vocabulary()
         self.dimension: int                     =   len(self.vocabulary)

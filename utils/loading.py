@@ -1,20 +1,23 @@
 import sys, time, threading, itertools
 
-def loading_animation(message: str = "Loading...", delay: float = 0.1):
+def loading_animation(message: str | list  = "Loading...", delay: float = 0.1):
     """
     Displays a loading animation in the console.
     Returns a function to stop the animation.
     """
     stop_event = threading.Event()
 
+    if isinstance(message, str):
+        message = [message]
+
     def animate():
         for c in itertools.cycle(['|', '/', '-', '\\']):
             if stop_event.is_set():
                 break
-            sys.stdout.write(f'\r{message} {c}')
+            sys.stdout.write(f'\r{message[0]} {c}')
             sys.stdout.flush()
             time.sleep(delay)
-        sys.stdout.write('\r' + ' ' * (len(message) + 2) + '\r')
+        sys.stdout.write('\r' + ' ' * (len(message[0]) + 2) + '\r')
 
     t = threading.Thread(target=animate)
     t.start()
