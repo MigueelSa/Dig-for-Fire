@@ -4,16 +4,15 @@ from abc import ABC, abstractmethod
 
 from models.models import AlbumData, LibraryData, EmbeddingData, MethodType, TokenType
 from utils.paths import output_path
-from utils.albums import get_album_genres, get_album_tags
 from tags.tags import Tags
 
 class Embeddings(ABC):
 
-    def __init__(self, library: LibraryData):
+    def __init__(self, library: LibraryData, token_type: TokenType, method: MethodType) -> None:
         self.tags                           =   Tags()
         self.library: LibraryData           =   library
-        self.token_type: TokenType | None   =   None
-        self.method: MethodType | None      =   None
+        self.token_type: TokenType          =   token_type
+        self.method: MethodType             =   method
     
     def _save_embeddings(self, embeddings: EmbeddingData, save_dir = output_path("data")) -> None:
         dimension = len(next(iter(embeddings.values())))
@@ -52,16 +51,15 @@ class Embeddings(ABC):
         pass
     
     def _vocabulary_hash(self, embedding_dimension: int) -> str:
-        library_data = [
-            {
-                "genres": list(get_album_genres(a).keys()),
-                "tags": list(get_album_tags(a).keys())
-            }
-            
-            for a in self.library
-        ]
+        library_snapshot = [{"id": album.get("id"), "date": album.get("date")} for album in self.library]
 
-        payload = json.dumps({"library": library_data, "method": self.method, "token_type": self.token_type, "embedding_dimension": embedding_dimension}, sort_keys=True)
+        payload = json.dumps({
+            "vocabulary": self.vocabulary,
+            "library_snapshot": library_snapshot,
+            "method": self.method, 
+            "token_type": self.token_type, 
+            "embedding_dimension": embedding_dimension
+            }, sort_keys=True)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
     
     @abstractmethod

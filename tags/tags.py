@@ -192,6 +192,7 @@ if __name__ == "__main__":
         root = genres._normalize_tag(root)
         genres.edit_repo_genre(root, ancestor = [])
     genres.edit_repo_genre("trap", ancestor = ["gangsta_rap", "hardcore_hip_hop", "electronic"])
-    genres.edit_repo_genre("progressive_rock", alias="prog_rock")
+    genres.edit_repo_genre("progressive", alias="prog")
+    #genres.edit_repo_genre("progressive_rock", alias="prog_rock")
 
     genres.build_repo_from_txt(repo_txt)

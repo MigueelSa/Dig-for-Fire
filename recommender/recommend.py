@@ -5,11 +5,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import normalize
 import musicbrainzngs as mb
 import pandas as pd
-from tqdm import tqdm
 from collections import Counter
 
 from models.models import LibraryData, MethodType
 from libraries.libraries import MusicBrainz
+from utils.loading import loading_animation
 from utils.paths import output_path
 from embeddings.genre_space import GenreSpace
 from embeddings.tag_space import TagSpace
@@ -32,39 +32,41 @@ class Recommender:
     def _fetch_recommendations(self) -> LibraryData:
         k, limit, threshold = self.k, self.limit, self.threshold
         kept_albums, kept_ids = [], set()
-        with tqdm(total=k, desc="Albums found.", leave = False) as pbar:
-            while len(kept_albums) < k:
-                random_tokens = self._genre_tag_randomizer(1)
-                fetched_albums = self._fetch_albums(random_tokens, limit)
-                if not fetched_albums:
-                    continue
-                fetched_albums_gspace_matrix, fetched_albums_tspace_matrix = self._space_matrix(fetched_albums)
-                genre_similarity_projections = cosine_similarity(fetched_albums_gspace_matrix, self.taste_gv)
-                tag_similarity_projections = cosine_similarity(fetched_albums_tspace_matrix, self.taste_tv)
-                similarity_scores = self._similarity_scores(genre_similarity_projections, tag_similarity_projections)
-                for album, similarity_score in zip(fetched_albums, similarity_scores.flatten()):
-                    album_id = self.mb_library._canonical_album(album)
-                    if similarity_score >= threshold and album_id not in kept_ids and album_id not in self.excluded_albums:
-                        kept_albums.append((album, similarity_score))
-                        kept_ids.add(album_id)
-                        self.excluded_albums.add(album_id)
-                        pbar.update(1)
-            df = pd.DataFrame(kept_albums, columns=["album", "score"])
-            df = df.sort_values("score", ascending=False)
-            top_albums = []
-            for _, row in df.iterrows():
-                album_info = row["album"]
-                album_dict = {
-                    "id": album_info.get("id"),
-                    "title": album_info.get("title"),
-                    "artist": album_info.get("artist"),
-                    "date": album_info.get("date"),
-                    "genres": album_info.get("genres", []),
-                    "tags": album_info.get("tags", []),
-                    "source": album_info.get("source"),
-                    "score": row["score"]
-                }
-                top_albums.append(album_dict)
+        message = [f"Fetching recommendations... 0/{k} albums found"]
+        stop = loading_animation(message)
+        while len(kept_albums) < k:
+            message[0] = f"Fetching recommendations... {len(kept_albums)}/{k} albums found"
+            random_tokens = self._genre_tag_randomizer(1)
+            fetched_albums = self._fetch_albums(random_tokens, limit)
+            if not fetched_albums:
+                continue
+            fetched_albums_gspace_matrix, fetched_albums_tspace_matrix = self._space_matrix(fetched_albums)
+            genre_similarity_projections = cosine_similarity(fetched_albums_gspace_matrix, self.taste_gv)
+            tag_similarity_projections = cosine_similarity(fetched_albums_tspace_matrix, self.taste_tv)
+            similarity_scores = self._similarity_scores(genre_similarity_projections, tag_similarity_projections)
+            for album, similarity_score in zip(fetched_albums, similarity_scores.flatten()):
+                album_id = self.mb_library._canonical_album(album)
+                if similarity_score >= threshold and album_id not in kept_ids and album_id not in self.excluded_albums:
+                    kept_albums.append((album, similarity_score))
+                    kept_ids.add(album_id)
+                    self.excluded_albums.add(album_id)
+        stop()
+        df = pd.DataFrame(kept_albums, columns=["album", "score"])
+        df = df.sort_values("score", ascending=False)
+        top_albums = []
+        for _, row in df.iterrows():
+            album_info = row["album"]
+            album_dict = {
+                "id": album_info.get("id"),
+                "title": album_info.get("title"),
+                "artist": album_info.get("artist"),
+                "date": album_info.get("date"),
+                "genres": album_info.get("genres", []),
+                "tags": album_info.get("tags", []),
+                "source": album_info.get("source"),
+                "score": row["score"]
+            }
+            top_albums.append(album_dict)
         return top_albums[:k]
 
     def _similarity_scores(self, genre_similarity_projections: np.ndarray, tag_similarity_projections: np.ndarray, genre_weight: float = 0.6) -> np.ndarray:
