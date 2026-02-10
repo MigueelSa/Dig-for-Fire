@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-import os, json, spotipy, math, logging, pickle, re
+import os, json, spotipy, math, logging, pickle, re, unicodedata
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
 import musicbrainzngs as mb
@@ -56,6 +56,9 @@ class Library(ABC):
             album_id = album.get("id")
 
             return title, artist, date, album_id
+    
+    def load_library(self, library_path: str) -> None:
+        self.library = self._load_library(library_path)
 
 class Spotify(Library):
 
@@ -140,11 +143,14 @@ class MusicBrainz(Library):
         release                 =   data.get("release", {})
         # artist
         artist_credit           =   release.get("artist-credit") or []
-        artist                  =   [artist.get("artist", {}).get("name") for artist in artist_credit if isinstance(artist, dict)]
+        artist                  =   artist = [
+                                            unicodedata.normalize("NFC", artist.get("artist", {}).get("name", ""))
+                                            for artist in artist_credit if isinstance(artist, dict)
+                                        ]
         # album
         release_group           =   release.get("release-group") or {}
         release_id              =   release_group.get("id", "")
-        title                   =   release_group.get("title", "")
+        title                   =   unicodedata.normalize("NFC", release_group.get("title", ""))
         date                    =   release_group.get("first-release-date", "")
         tags_list               =   release_group.get("tag-list") or []
         tag_names               =   [tag.get("name") for tag in tags_list]
@@ -218,7 +224,9 @@ class MusicBrainz(Library):
                 self.library = library
                 self._save_library(write_json=False)
 
-        self.library = library
+        unique_library = {self._canonical_album(a): a for a in self.library}
+        self.library = list(unique_library.values())
+        #self.library = library
 
 
     def add_album(self, title: str, artist: str) -> None: 

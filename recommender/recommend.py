@@ -1,4 +1,4 @@
-import logging
+import logging, time
 import os, json, random
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
@@ -14,13 +14,14 @@ from utils.paths import output_path
 from embeddings.genre_space import GenreSpace
 from embeddings.tag_space import TagSpace
 from utils.albums import get_album_genres, get_album_tags
+from ml.predictor import Predictor
 
 class Recommender:
 
-    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 1, threshold: float = 0.6, 
+    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 5, limit: int = 10, threshold: float = 0.6, 
                  method: MethodType = "pmi", n_clusters: int = 50):
         self.mb_library                                                                         =   MusicBrainz(app_name, app_version, email)
-        self.library                                                                            =   self._load_library(library_path)
+        self.library                                                                            =   self.mb_library._load_library(library_path)
         self.roots                                                                              =   self.mb_library.tags.roots
         self.genre_embeddings, self.tag_embeddings                                              =   GenreSpace(self.library, method=method), TagSpace(self.library, n_clusters=n_clusters)
         self.taste_gv, self.taste_tv                                                            =   self._taste_vectors()
@@ -28,28 +29,50 @@ class Recommender:
         self.used_tokens                                                                        =   set()
         self.excluded_albums                                                                    =   self._excluded_albums()
         self.genre_counts, self.root_counts, self.tag_counts, self.unseen_siblings              =   self._pools()
+        self.predictor                                                                          =   Predictor(self._load_recommendations(), self.library, self.genre_embeddings, self.tag_embeddings, balanced=False)
 
     def _fetch_recommendations(self) -> LibraryData:
         k, limit, threshold = self.k, self.limit, self.threshold
         kept_albums, kept_ids = [], set()
-        message = [f"Fetching recommendations... 0/{k} albums found"]
+        albums_looked = 0
+        albums_found_message = f"Fetching recommendations. 0/{k} albums found."
+        normal_message = albums_found_message + f" {albums_looked} albums looked up."
+        message = [normal_message]
         stop = loading_animation(message)
         while len(kept_albums) < k:
-            message[0] = f"Fetching recommendations... {len(kept_albums)}/{k} albums found"
+            albums_found_message = f"Fetching recommendations. {len(kept_albums)}/{k} albums found."
+            normal_message = albums_found_message + f" {albums_looked} albums looked up."
+            picky_message = normal_message + " You are really picky!"
+            message[0] = normal_message if albums_looked < 50 else picky_message
+
+            #print("starts here")
             random_tokens = self._genre_tag_randomizer(1)
+            #print("randomizer done")
             fetched_albums = self._fetch_albums(random_tokens, limit)
+            #print("fetch done")
             if not fetched_albums:
                 continue
             fetched_albums_gspace_matrix, fetched_albums_tspace_matrix = self._space_matrix(fetched_albums)
+            #print("space matrix done")
+
             genre_similarity_projections = cosine_similarity(fetched_albums_gspace_matrix, self.taste_gv)
             tag_similarity_projections = cosine_similarity(fetched_albums_tspace_matrix, self.taste_tv)
+            #print("similarity done")
             similarity_scores = self._similarity_scores(genre_similarity_projections, tag_similarity_projections)
+
+            if self.predictor.is_safe:
+                album_features = np.hstack([fetched_albums_gspace_matrix, fetched_albums_tspace_matrix])
+                album_scores = self.predictor.model.predict_proba(album_features)[:, 1]
+                similarity_scores = (1-self.predictor.alpha)*similarity_scores + self.predictor.alpha*album_scores
+
             for album, similarity_score in zip(fetched_albums, similarity_scores.flatten()):
                 album_id = self.mb_library._canonical_album(album)
                 if similarity_score >= threshold and album_id not in kept_ids and album_id not in self.excluded_albums:
                     kept_albums.append((album, similarity_score))
                     kept_ids.add(album_id)
                     self.excluded_albums.add(album_id)
+            #print("albums processed")
+            albums_looked += len(fetched_albums)
         stop()
         df = pd.DataFrame(kept_albums, columns=["album", "score"])
         df = df.sort_values("score", ascending=False)
@@ -83,11 +106,6 @@ class Recommender:
         for ialbum,  album in enumerate(top_albums):
             output += f"{ialbum+1}. {album['title']} by {', '.join(album['artist'])}. Genres: {', '.join(album['genres'])}. Tags: {', '.join(album['tags'])}. Similarity score: {album['score']}.\n"
         return output
-
-    def _load_library(self, library_path: str) -> LibraryData:
-        with open(library_path, "r") as file:
-            library = json.load(file)
-        return library
     
 
     def _taste_vectors(self) -> tuple[np.ndarray, np.ndarray]:
@@ -218,6 +236,7 @@ class Recommender:
             try:
                 result = mb.search_releases(query=f'tag:{token} AND primarytype:album', limit=limit)
                 releases = result.get("release-list", [])
+                time.sleep(1)  # throttle: wait 1 second between requests
             except (mb.ResponseError, mb.NetworkError) as e:
                 logging.warning(f"Skipping token {token}: {e}")
                 continue
