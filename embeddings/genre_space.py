@@ -1,5 +1,5 @@
 from embeddings.embeddings import Embeddings
-from models.models import AlbumData, LibraryData, EmbeddingData, MethodType, TokenType
+from models.models import AlbumData, LibraryData, EmbeddingData, MethodType
 from utils.albums import get_album_genres
 from utils.paths import output_path
 
