@@ -9,7 +9,7 @@ class Tags:
         self.repo_file                                      =   resource_path("tags", "MusicBrainz-genres_repo.json")
         self.canonical_genres, self.aliases, self.ancestors =   self._load_repo()
         self.roots                                          =   self._roots()
-        self.ancestors_children                              =   self._get_ancestors_children()
+        self.ancestors_children                             =   self._get_ancestors_children()
         #self.skipped_genres: set[str]                       =   set()
 
 

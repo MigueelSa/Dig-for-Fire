@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
-import os, json, spotipy, math, logging, pickle, re, unicodedata
+import os, json, spotipy, math, logging, pickle, re, unicodedata, requests
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
 import musicbrainzngs as mb
 from musicbrainzngs import WebServiceError
 
 from tags.tags import Tags
-from models.models import AlbumData, LibraryData
+from models.models import AlbumData, LibraryData, LibraryType
 from utils.paths import output_path
 
 
@@ -14,7 +14,7 @@ class Library(ABC):
     """Abstract class for any music platform."""
 
     def __init__(self):
-        self.platform: str | None               =   None
+        self.platform: LibraryType | None       =   None
         self.library: LibraryData               =   []
         self.local_library: LibraryData | None  =   None
 
@@ -48,14 +48,13 @@ class Library(ABC):
             library = json.load(f)
         return library
 
-    def _canonical_album(self, album: AlbumData) -> tuple[str, tuple[str], str, str | None]:
-            title = re.sub(r"\s+", " ", album["title"].lower().strip())
-            title = re.sub(r"\(.*?\)|\[.*?\]|deluxe|remaster(ed)?", "", title)
-            artist = tuple(sorted(re.sub(r"\s+", " ", a.lower().strip()) for a in album["artist"] if a))
-            date = album.get("date")
-            album_id = album.get("id")
+    def _normalize_title(self, title: str) -> str:
+        if "(" in title and ")" in title:
+            title = re.sub(r"\(.*?\)", "", title)
+        title = title.lower().replace("&", "and").strip()
+        return title
 
-            return title, artist, date, album_id
+
     
     def load_library(self, library_path: str) -> None:
         self.library = self._load_library(library_path)
@@ -64,15 +63,16 @@ class Spotify(Library):
 
     def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
         super().__init__()
-        self.sp             =       spotipy.Spotify(auth_manager=SpotifyOAuth(
-                client_id       =   client_id,
-                client_secret   =   client_secret,
-                redirect_uri    =   redirect_uri,
-                scope           =   "user-library-read"
+        self.sp                     =       spotipy.Spotify(auth_manager=SpotifyOAuth(
+                client_id           =   client_id,
+                client_secret       =   client_secret,
+                redirect_uri        =   redirect_uri,
+                scope               =   "user-library-read",
+                requests_timeout    =   20
         ))
 
-        self.platform           =       "Spotify"
-        self.limit              =       50
+        self.platform: LibraryType  =   "Spotify"
+        self.limit                  =       50
         self._fetch_library()
 
     def _feed_release(self, data: AlbumData) -> AlbumData:
@@ -84,7 +84,7 @@ class Spotify(Library):
         # album
         title           =   data.get("name", "")
         date            =   data.get("release_date", "")
-        genres, tags    =   [], []
+        genres, tags    =   {}, []
 
         album = {
                 "id": release_id,
@@ -125,9 +125,9 @@ class MusicBrainz(Library):
         super().__init__()
         mb.set_useragent(app_name, app_version, email)
 
-        self.platform           =       "MusicBrainz"
-        self.skipped_albums     =       set()
-        self.tags               =       Tags()
+        self.platform: LibraryType  =   "MusicBrainz"
+        self.skipped_albums         =   set()
+        self.tags                   =   Tags()
 
     def _feed_release(self, data: AlbumData) -> AlbumData:
         """
@@ -143,10 +143,11 @@ class MusicBrainz(Library):
         release                 =   data.get("release", {})
         # artist
         artist_credit           =   release.get("artist-credit") or []
-        artist                  =   artist = [
-                                            unicodedata.normalize("NFC", artist.get("artist", {}).get("name", ""))
-                                            for artist in artist_credit if isinstance(artist, dict)
-                                        ]
+        artist                  =   [
+                                    unicodedata.normalize("NFC", artist.get("artist", {}).get("name", ""))
+                                    for artist in artist_credit if isinstance(artist, dict)
+                                    ]
+        artist_id               =   [artist.get("artist", {}).get("id", "") for artist in artist_credit if isinstance(artist, dict)]
         # album
         release_group           =   release.get("release-group") or {}
         release_id              =   release_group.get("id", "")
@@ -163,6 +164,7 @@ class MusicBrainz(Library):
                 "id": release_id,
                 "title": title,
                 "artist": artist,
+                "artist_id": artist_id,
                 "date": date,
                 "genres": genres, # distance_dict
                 "tags": tags,
@@ -172,7 +174,7 @@ class MusicBrainz(Library):
         return album
     
 
-    def fetch_library(self, local_library_path: str, batch_size: int = 50, **kwargs) -> None:
+    def fetch_library(self, local_library_path: str, batch_size: int = 50) -> None:
         self.local_library = self._load_library(local_library_path)
 
         pickle_file = os.path.join(self.save_dir, f"{self.platform}-Dig-for-Fire.pkl")
@@ -183,21 +185,21 @@ class MusicBrainz(Library):
         else:
             self.library = []
 
-        self._fetch_library(batch_size=batch_size, **kwargs)
+        self._fetch_library(batch_size=batch_size)
         self._save_library()
 
 
-    def _fetch_library(self, batch_size: int = 50, **kwargs) -> None:
-        # this will still be slow on a rerun due to musicbrainz fetching albums and artists with a slight different name from spotify like albums with deluxe and characters like ^...
+    def _fetch_library(self, **kwargs) -> None:
+        batch_size = kwargs.get("batch_size", 50)
         assert self.local_library is not None
         library = self.library
-        existing_albums = {self._canonical_album(album) for album in library}
+        existing_albums = {album.get("local_id") for album in library if album.get("local_id")}
 
         for ialbum, album in enumerate(tqdm(self.local_library, desc = "Enriching library with MusicBrainz...", leave = False, mininterval=5.0)):
-            key = self._canonical_album(album)
-            if key in existing_albums:
+            local_id = album.get("id")
+            if local_id in existing_albums:
                 continue
-            artist, name = album.get("artist", []), album.get("title", "")
+            artist, name = album.get("artist", []), self._normalize_title(album.get("title", ""))
             artist = " AND ".join(artist) if isinstance(artist, list) else artist
 
             try:
@@ -208,25 +210,24 @@ class MusicBrainz(Library):
                     release_id = release["id"]
                     full = mb.get_release_by_id(release_id, includes=["tags", "release-groups", "artist-credits", "media"])
                     album_data = self._feed_release(full)
+                    if local_id:
+                        album_data["local_id"] = local_id
                 else:
                     album_data = album.copy()
-                    album_data["source"] = "Spotify"
 
             except WebServiceError as e:
                 album_data = album.copy()
-                album_data["source"] = "Spotify"
                 logging.error(f"Failed to retrieve MusicBrainz data for {artist}-{name}: {e}", exc_info=True)
 
+
             library.append(album_data)
-            existing_albums.add(key)
+            existing_albums.add(local_id)
 
             if (ialbum+1) % batch_size == 0:
                 self.library = library
                 self._save_library(write_json=False)
 
-        unique_library = {self._canonical_album(a): a for a in self.library}
-        self.library = list(unique_library.values())
-        #self.library = library
+        self.library = library
 
 
     def add_album(self, title: str, artist: str) -> None: 
@@ -253,13 +254,11 @@ class MusicBrainz(Library):
             logging.error(f"Failed to retrieve MusicBrainz data for {artist}-{title}: {e}", exc_info=True)
             print(f"MusicBrainz lookup failed for {artist} – {title}: {e}")
 
+
 if __name__ == "__main__":
     import argparse, time
     start_time = time.time()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--app_name', type=str, required=True, help="Name of the app.")
-    parser.add_argument('--app_version', type=str, required=True, help="Version of the app.")
-    parser.add_argument('--email', type=str, required=True, help="Email linked to project.")
     parser.add_argument('--library_path', type=str, required=True, help="Path of the local library.")
     args = parser.parse_args()
 
@@ -268,11 +267,12 @@ if __name__ == "__main__":
                         format='%(asctime)s - %(levelname)s - %(message)s',
                         level=logging.ERROR)
 
-    app_name, app_version, email, library_path = args.app_name, args.app_version, args.email, os.path.abspath(args.library_path)
+    app_name, app_version, email, library_path = "Dig-for-Fire", "0.1", "dig4fire-mail@proton.me", os.path.abspath(args.library_path)
 
     musicbrainz = MusicBrainz(app_name, app_version, email)
     musicbrainz.fetch_library(library_path)
     musicbrainz.add_album("The Rainbow Goblins", "Masayoshi Takanaka")
+    
 
     '''
     parser = argparse.ArgumentParser()

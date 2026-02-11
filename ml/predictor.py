@@ -3,6 +3,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
 
+
 from models.models import AlbumData, LibraryData, EmbeddingData
 from utils.paths import output_path
 
@@ -72,7 +73,6 @@ class Predictor:
 if __name__ == "__main__":
     from libraries.libraries import MusicBrainz
     from sklearn.metrics import accuracy_score, roc_auc_score
-    from sklearn.metrics import classification_report
 
     from embeddings.genre_space import GenreSpace
     from embeddings.tag_space import TagSpace
