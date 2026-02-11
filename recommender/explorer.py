@@ -35,7 +35,9 @@ class Explorer:
 
         return genre_counts, root_counts, tag_counts, unseen_siblings
 
-    def _genre_tag_randomizer(self, k: int, g_probability: float = 0.6, r_probability: float = 0.25) -> list[tuple[str, str]]:
+    def _genre_tag_randomizer(self, k: int, **kwargs) -> list[tuple[str, str]]:
+        g_probability = kwargs.get("g_probability", 0.6)
+        r_probability = kwargs.get("r_probability", 0.25)
         
         genres, roots, tags, unseen_siblings = self.genre_counts, self.root_counts, self.tag_counts, self.unseen_siblings
 
@@ -80,3 +82,35 @@ class Explorer:
                 tokens_set.add(token)
         self.used_tokens.update(token for token, _ in random_tokens)
         return random_tokens
+    
+    def _random_artist_generator(self, k: int) -> list[str]:
+        num_albums = len(self.library)
+        artists = []
+        for _ in range(k):
+            irandom_artist = random.randint(0, num_albums - 1)
+            random_artist = self.library[irandom_artist].get("artist", [])
+            if random_artist:
+                if isinstance(random_artist, list):
+                    artists.extend(random_artist)
+                else:
+                    artists.append(random_artist)
+        return [(artist, "artist") for artist in artists[:k]]
+    
+    def _pick_random_similar(self, similars: list[dict[str, str | float]]) -> dict[str, str | float] | None:
+        if not similars:
+            return None
+
+        weights = [s.get("match", 0.0) for s in similars]
+        # fallback if all matches are zero
+        if sum(weights) == 0:
+            return random.choice(similars)
+
+        return random.choices(similars, weights=weights, k=1)[0].get("name")
+    
+    def _random_artist_genre_tag_generator(self, k: int, a_probability: float = 0.6, **kwargs) -> list[tuple[str, str]]:
+        if random.random() < a_probability:
+            random_artist = self._random_artist_generator(k)
+            if random_artist:
+                return random_artist
+        else:
+            return self._genre_tag_randomizer(k, **kwargs)

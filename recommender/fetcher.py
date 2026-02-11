@@ -1,9 +1,10 @@
-import logging, time, re
+import logging, time, re, requests, logging, json, os, pickle
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import musicbrainzngs as mb
 from sklearn.preprocessing import normalize
+from dotenv import load_dotenv
 
 from embeddings.genre_space import GenreSpace
 from embeddings.tag_space import TagSpace
@@ -12,6 +13,7 @@ from models.models import AlbumData, LibraryData
 from utils.loading import loading_animation
 from recommender.explorer import Explorer
 from libraries.libraries import MusicBrainz
+from utils.paths import output_path
 
 class Fetcher:
     def __init__(self, library: dict[str, AlbumData], mb_library: MusicBrainz, genre_embeddings: GenreSpace, tag_embeddings: TagSpace, 
@@ -40,9 +42,15 @@ class Fetcher:
     
     def _fetch_albums(self, tokens: list[tuple[str, str]], limit: int) -> LibraryData:
         fetched_albums = {}
-        for token, _ in tokens:
+        for token, token_type in tokens:
             try:
-                result = mb.search_releases(query=f'tag:{token} AND primarytype:album', limit=limit)
+                if token_type == "artist":
+                    artist = self._fetch_similar([token], limit=limit)
+                    if not artist:
+                        continue
+                    result = mb.search_releases(query=f'artist:{artist} AND primarytype:album', limit=limit)
+                else:
+                    result = mb.search_releases(query=f'tag:{token} AND primarytype:album', limit=limit)
                 releases = result.get("release-list", [])
                 time.sleep(1)  # throttle: wait 1 second between requests
             except (mb.ResponseError, mb.NetworkError) as e:
@@ -81,7 +89,7 @@ class Fetcher:
             message[0] = normal_message if albums_looked < 25 * self.k else picky_message
 
             #print("starts here")
-            random_tokens = self.explorer._genre_tag_randomizer(1)
+            random_tokens = self.explorer._random_artist_genre_tag_generator(1)
             #print("randomizer done")
             fetched_albums = self._fetch_albums(random_tokens, limit)
             #print("fetch done")
@@ -170,4 +178,71 @@ class Fetcher:
 
         return gv, tv
     
+    def _fetch_similar_by_mbid(self, mbid: str, api_key: str, limit: int = 10, LASTFM_URL: str = "https://ws.audioscrobbler.com/2.0/") -> list[dict[str, str | float]]:
+        params = {
+            "method": "artist.getSimilar",
+            "mbid": mbid,
+            "api_key": api_key,
+            "format": "json",
+            "limit": limit
+        }
+
+        try:
+            r = requests.get(LASTFM_URL, params=params, timeout=10)
+            r.raise_for_status()
+            data = r.json()
+
+            artists = data.get("similarartists", {}).get("artist", [])
+
+            return [
+                {
+                    "name": a["name"],
+                    "mbid": a.get("mbid"),
+                    "match": float(a.get("match", 0))
+                }
+                for a in artists if a.get("name")
+            ]
+
+        except requests.RequestException as e:
+            logging.warning(f"Error fetching MBID {mbid}: {e}")
+            return []
+        
+
     
+    def _fetch_similar(self, artist: list[str], limit: int = 100, sleep_time: float = 1.0) -> str | None:
+        load_dotenv()
+        api_key = os.getenv("LASTFM_KEY")
+        if not api_key:
+            logging.warning(f"No Last.fm API key set. Skipping similar artist fetching.")
+            return {}
+
+        results = []
+        for artist_name in artist:
+
+            mbid = [a.get("artist_id") for a in self.library if artist_name in a.get("artist", [])][0]
+            similar = self._fetch_similar_by_mbid(mbid, api_key, limit)
+            results.extend(similar)
+
+            time.sleep(sleep_time)
+
+        random_artist = self.explorer._pick_random_similar(results)
+
+        return random_artist
+    
+    def _save_file(self, dictionary: dict, write_json=True):
+        save_dir = output_path("data")
+        os.makedirs(save_dir, exist_ok=True)
+
+        if write_json:
+            file_name = f"Last.fm-similar_artists-Dig-for-Fire.json"
+            output_file = os.path.join(save_dir, file_name)
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(dictionary, f, indent=4, ensure_ascii=False)
+
+        file_name = f"Last.fm-similar_artists-Dig-for-Fire.pkl"
+        output_file = os.path.join(save_dir, file_name)
+        tmp_file = output_file + ".tmp"
+
+        with open(tmp_file, "wb") as f:
+            pickle.dump(dictionary, f)
+        os.replace(tmp_file, output_file)

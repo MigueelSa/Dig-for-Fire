@@ -180,6 +180,13 @@ class Tags:
         """
         roots = set(genre for genre, ancestors in self.ancestors.items() if not ancestors)
         return roots
+    
+    def get_library_artists(self, library: list[dict]) -> dict[str, str]:
+        artists = {} 
+        for album in library:
+            for id, artist in enumerate(album.get("artist", [])):
+                artists[artist] = album.get("artist_id", [None])[id]
+        return artists
 
 if __name__ == "__main__":
     genres = Tags()
