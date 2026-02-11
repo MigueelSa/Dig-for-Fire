@@ -1,31 +1,7 @@
 # Dig-for-Fire
 
-**Dig-for-Fire** is a content-based music recommendation system built on top of **MusicBrainz** metadata.
-It analyzes a user’s existing music library, builds semantic embeddings from genres and tags, and explores adjacent musical space to recommend new albums.
-
-> Work-in-progress. Machine learning integration and web interface planned.
-
----
-
-## What this project does
-
-1. Start from a **local library**.
-2. **Enrich albums with MusicBrainz** (genres, tags, hierarchy).
-3. Normalize genres into a **directed ontology** (roots → subgenres).
-4. Embed albums into **genre space** and **tag space**.
-5. Aggregate user taste vectors from the full library.
-6. Randomly explore **weighted genres/tags**.
-7. Fetch candidate albums from MusicBrainz.
-8. Rank candidates by **cosine similarity** to user taste.
-
-The result is a recommender that:
-
-- explores beyond obvious genres
-- favors stylistic proximity
-- remains interpretable
-
-The system is designed to be **incremental**:
-already-recommended albums are tracked and excluded in future runs.
+**Dig-for-Fire** is a content-based music recommendation engine built on top of **MusicBrainz metadata**.
+It enriches a local album library with structured genre and tag information, builds multiple embedding spaces, and explores adjacent musical regions to generate recommendations.
 
 ---
 
@@ -33,56 +9,211 @@ already-recommended albums are tracked and excluded in future runs.
 
 ```
 Dig-for-Fire/
-├── analysis/           # Exploratory analysis & plotting
-├── embeddings/         # Album → vector embeddings
-├── libraries/          # MusicBrainz ingestion
-├── models/             # Core data types and method enums
-├── recommender/        # Recommendation logic
-├── tags/               # Genre normalization & ontology
-├── utils/              # Paths, album helpers
-├── main.py             # CLI entry point
+│
+├── embeddings/
+│   ├── embeddings.py
+│   ├── genre_space.py
+│   └── tag_space.py
+│
+├── libraries/
+│   └── libraries.py
+│
+├── recommender/
+│   ├── recommend.py
+│   ├── fetcher.py
+│   ├── explorer.py
+│   └── predictor.py
+│
+├── tags/
+│   └── tags.py
+│
+├── utils/
+│   ├── albums.py
+│   ├── paths.py
+│   └── loading.py
+│
+├── models/
+│   └── models.py
+│
+└── main.py
+
 
 ```
 ---
 
-## Genre system
+## Core Pipeline
 
-- Genres are normalized (case, separators, aliases).
-- A **directed ancestor graph** encodes relationships.
-- Root genres (e.g. `rock`, `jazz`, `electronic`) are treated separately.
-- Distance from leaf genres to ancestors is computed and stored.
+### 1. Library Enrichment
 
----
+Input: local JSON library (artist + album).
 
-## Embeddings
+The system:
 
-Each album is embedded twice:
+- Queries MusicBrainz  
+- Fetches:
+  - Release-group metadata  
+  - Tag list  
+  - Artist credits  
+- Normalizes genres via a directed ontology  
+- Stores enriched library as:
+  - `MusicBrainz-Dig-for-Fire.json`
+  - `MusicBrainz-Dig-for-Fire.pkl`
 
-- **Genre vector**
-- **Tag vector**
+Incremental updates are supported.
 
-Supported methods:
+### 2. Genre System (Directed Ontology)
 
-- `cooc`
-- `pmi`
-- `ppmi`
-- `svd`
+Genres are:
 
-Embeddings are aggregated across the user’s library to form **taste vectors**, which are then compared against candidate albums using cosine similarity.
+- Normalized (case, separators, aliases)
+- Linked via ancestor relationships
+- Grouped into **root genres**
+- Stored with minimal ancestor distance
 
----
+Each album stores:
 
-## Recommendation strategy
+```python
+{
+  "genres": { "psychedelic_rock": 0, "rock": 1 },
+  "tags": ["lofi", "experimental"]
+}
+```
 
-- Tokens (genres / roots / tags) are sampled **probabilistically**, weighted by frequency.
-- Previously seen albums and past recommendations are excluded.
-- Candidate albums are fetched live from MusicBrainz.
-- Final ranking uses a weighted genre/tag similarity score.
+Distance represents depth in the ontology graph.
 
-This balances:
+### 3. Embedding Spaces
 
-- exploitation (known tastes)
-- exploration (unseen but related styles)
+Two independent embedding spaces are constructed.
+
+#### GenreSpace
+
+Supported embedding methods:
+
+| Method | Definition |
+|--------|------------|
+| `cooc` | Row-normalized co-occurrence matrix |
+| `pmi`  | `log( P(i,j) / (P(i)P(j)) )` |
+| `ppmi` | `max(PMI, 0)` |
+| `svd`  | Truncated SVD of the co-occurrence matrix |
+
+
+#### Optional Smoothing
+
+Smoothing modifies the raw co-occurrence signal:
+
+- **Ancestor smoothing**  
+  Propagates weight to ontology parents.
+
+- **Neighborhood smoothing**  
+  Blends nearby genres in co-occurrence space.
+
+- **Node2Vec smoothing**  
+  Learns graph embeddings over the genre graph.
+
+#### TagSpace
+
+Tags are embedded semantically using: `sentence-transformers/all-MiniLM-L6-v2`
+
+Process:
+
+1. Encode all unique tags
+2. Cluster embeddings with KMeans
+3. Use cluster centroids as semantic regions
+
+This creates a **mood / descriptor layer** orthogonal to structural genre space.
+
+### Why Two Spaces?
+
+Genres and tags capture different signals:
+
+| GenreSpace | TagSpace |
+|------------|----------|
+| Structural style | Descriptive semantics |
+| Graph-driven | Language-driven |
+
+### 4. Taste Vector Construction
+
+For each album:
+
+```python
+album_embedding = genre_vector ⊕ tag_vector
+```
+
+User taste vector is derived from the full library.
+
+Cosine similarity is used for ranking.
+
+### 5. Exploration Strategy
+
+The `Explorer` module probabilistically samples:
+
+- Seen genres (weighted by frequency)
+- Roots → unseen children
+- Tags
+- Random artists
+
+Used tokens are tracked per run.
+
+### 6. Candidate Fetching
+
+Candidates are retrieved live from MusicBrainz:
+
+- Genre-based search
+- Tag-based search
+- Artist similarity
+
+Already-owned and previously-recommended albums are excluded.
+
+### 7. Ranking
+
+Candidates are ranked by:
+```python
+score = weighted cosine(genre_space) + weighted cosine(tag_space)
+```
+
+Threshold filtering is applied.
+
+Recommendation history is persisted to:
+
+```python
+data/recommendation-history-Dig-for-Fire.json
+```
+
+## Optional ML Layer: Predictor
+
+A RandomForest classifier can be trained on:
+- Previously recommended albums
+- Owned library
+
+Features:
+- Concatenated genre + tag embeddings
+
+Outputs:
+- Macro-F1-derived alpha weight
+- Safety checks for class imbalance
+
+A **visual scheme of the pipeline** can be seen in the following graph. 
+
+```python
+Library JSON
+    ↓
+MusicBrainz Enrichment
+    ↓
+Genre Ontology + Tags
+    ↓
+GenreSpace      TagSpace
+      ↓            ↓
+   Album Embeddings
+          ↓
+     Taste Vector
+          ↓
+    Explorer → Candidates
+          ↓
+       Ranking
+          ↓
+  Final Recommendations
+```
+
 
 ---
 
@@ -166,9 +297,22 @@ pyinstaller --onefile --add-data tags/MusicBrainz-genres_repo.json:tags --name d
 
 ---
 
+## Embedding Caching
+
+Embeddings are saved as:
+```python
+data/embeddings-<hash>-Dig-for-Fire.npz
+```
+
+The hash includes:
+- Vocabulary
+- Library snapshot
+- Method
+- Token type
+- Embedding dimension
+
 ## Future Plans
 
-- **Genre graph**: nodes = genres; edges = taxonomy (sub → parent) + co-occurrence.
-- **Mood layer**: aggregate genres into moods.
-- **Graph-based recommendations**: explore related genres systematically.
-- **Web UI**: visualize graph and recommendations.   
+- Web interface for interactive exploration
+
+
