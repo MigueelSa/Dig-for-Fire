@@ -5,9 +5,9 @@ from tqdm import tqdm
 import musicbrainzngs as mb
 from musicbrainzngs import WebServiceError
 
-from tags.tags import Tags
-from models.models import AlbumData, LibraryData, LibraryType
-from utils.paths import output_path
+from digforfire.tags.tags import Tags
+from digforfire.models.models import AlbumData, LibraryData, LibraryType
+from digforfire.utils.paths import output_path
 
 
 class Library(ABC):

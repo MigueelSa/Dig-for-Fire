@@ -1,7 +1,8 @@
 import json, os, re
 from functools import lru_cache
 from typing import Any
-from utils.paths import resource_path
+
+from digforfire.utils.paths import resource_path
 
 class Tags:
 

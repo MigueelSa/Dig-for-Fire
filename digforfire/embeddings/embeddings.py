@@ -2,9 +2,9 @@ import numpy as np
 import os, json, hashlib
 from abc import ABC, abstractmethod
 
-from models.models import AlbumData, LibraryData, EmbeddingData, MethodType, TokenType
-from utils.paths import output_path
-from tags.tags import Tags
+from digforfire.models.models import AlbumData, LibraryData, EmbeddingData, MethodType, TokenType
+from digforfire.utils.paths import output_path
+from digforfire.tags.tags import Tags
 
 class Embeddings(ABC):
 

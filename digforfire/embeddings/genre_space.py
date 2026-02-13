@@ -1,13 +1,13 @@
-from embeddings.embeddings import Embeddings
-from models.models import AlbumData, LibraryData, EmbeddingData, MethodType
-from utils.albums import get_album_genres
-from utils.paths import output_path
+from digforfire.embeddings.embeddings import Embeddings
+from digforfire.models.models import AlbumData, LibraryData, EmbeddingData, MethodType
+from digforfire.utils.albums import get_album_genres
+from digforfire.utils.paths import output_path
+from digforfire.utils.loading import loading_animation
 
 import multiprocessing, hashlib, pickle, os
 import networkx as nx
 from node2vec import Node2Vec
 from gensim.models import KeyedVectors
-from utils.loading import loading_animation
 from typing import Literal
 import numpy as np
 from sklearn.decomposition import TruncatedSVD

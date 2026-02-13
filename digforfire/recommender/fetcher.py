@@ -6,14 +6,14 @@ import musicbrainzngs as mb
 from sklearn.preprocessing import normalize
 from dotenv import load_dotenv
 
-from embeddings.genre_space import GenreSpace
-from embeddings.tag_space import TagSpace
-from ml.predictor import Predictor
-from models.models import AlbumData, LibraryData
-from utils.loading import loading_animation
-from recommender.explorer import Explorer
-from libraries.libraries import MusicBrainz
-from utils.paths import output_path
+from digforfire.embeddings.genre_space import GenreSpace
+from digforfire.embeddings.tag_space import TagSpace
+from digforfire.ml.predictor import Predictor
+from digforfire.models.models import AlbumData, LibraryData
+from digforfire.utils.loading import loading_animation
+from digforfire.recommender.explorer import Explorer
+from digforfire.libraries.libraries import MusicBrainz
+from digforfire.utils.paths import output_path
 
 class Fetcher:
     def __init__(self, library: dict[str, AlbumData], mb_library: MusicBrainz, genre_embeddings: GenreSpace, tag_embeddings: TagSpace, 
@@ -56,7 +56,6 @@ class Fetcher:
             except (mb.ResponseError, mb.NetworkError) as e:
                 logging.warning(f"Skipping token {token}: {e}")
                 continue
-
             for release in releases:
                 release_id = release.get("id")
                 if not release_id:
@@ -78,15 +77,10 @@ class Fetcher:
         k, limit, threshold = self.k, self.limit, self.threshold
         kept_albums, kept_ids = [], set()
         albums_looked = 0
-        albums_found_message = f"Fetching recommendations. 0/{k} albums found."
-        normal_message = albums_found_message + f" {albums_looked} albums looked up."
-        message = [normal_message]
+        message = [f"Fetching recommendations. 0/{k} albums found. {albums_looked} albums looked up."]
         stop = loading_animation(message)
         while len(kept_albums) < k:
-            albums_found_message = f"Fetching recommendations. {len(kept_albums)}/{k} albums found."
-            normal_message = albums_found_message + f" {albums_looked} albums looked up."
-            picky_message = normal_message + " You are really picky!"
-            message[0] = normal_message if albums_looked < 25 * self.k else picky_message
+            message[0] = f"Fetching recommendations. {len(kept_albums)}/{k} albums found. {albums_looked} albums looked up."
 
             #print("starts here")
             random_tokens = self.explorer._random_artist_genre_tag_generator(1)

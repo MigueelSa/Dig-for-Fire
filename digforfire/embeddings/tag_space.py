@@ -1,7 +1,7 @@
-from models.models import AlbumData, LibraryData, EmbeddingData
-from embeddings.embeddings import Embeddings
-from utils.albums import get_album_tags
-from utils.loading import loading_animation
+from digforfire.models.models import AlbumData, LibraryData, EmbeddingData
+from digforfire.embeddings.embeddings import Embeddings
+from digforfire.utils.albums import get_album_tags
+from digforfire.utils.loading import loading_animation
 
 from sentence_transformers import SentenceTransformer
 import numpy as np
