@@ -7,7 +7,7 @@ from digforfire.utils.paths import resource_path
 class Tags:
 
     def __init__(self):
-        self.repo_file                                      =   resource_path("tags", "MusicBrainz-genres_repo.json")
+        self.repo_file                                      =   resource_path("digforfire", "tags", "MusicBrainz-genres_repo.json")
         self.canonical_genres, self.aliases, self.ancestors =   self._load_repo()
         self.roots                                          =   self._roots()
         self.ancestors_children                             =   self._get_ancestors_children()
