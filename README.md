@@ -56,9 +56,9 @@ Dig-for-Fire/
 │       ├── tags.py
 │       └── MusicBrainz-genres_repo.json
 │
-├── requirements.txt
 ├── .gitignore
-└── README.md
+├── README.md
+└── requirements.txt
 ```
 ---
 
