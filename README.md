@@ -12,6 +12,7 @@ Dig-for-Fire/
 │
 ├── digforfire/
 │   ├── __init__.py
+|   ├── main.py
 │   │
 │   ├── analysis/
 │   │   ├── __init__.py
