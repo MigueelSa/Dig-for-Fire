@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-import os, json, spotipy, math, logging, pickle, re, unicodedata, requests
+import os, json, spotipy, math, logging, pickle, re, unicodedata
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
 import musicbrainzngs as mb
@@ -25,7 +25,7 @@ class Library(ABC):
         """Fetch albums from the platform and saves it to JSON file."""
         pass
 
-    def _save_library(self, write_json=True):
+    def _save_library(self, write_json=True) -> None:
         save_dir = self.save_dir
         os.makedirs(save_dir, exist_ok=True)
 
@@ -253,38 +253,3 @@ class MusicBrainz(Library):
         except WebServiceError as e:
             logging.error(f"Failed to retrieve MusicBrainz data for {artist}-{title}: {e}", exc_info=True)
             print(f"MusicBrainz lookup failed for {artist} – {title}: {e}")
-
-
-if __name__ == "__main__":
-    import argparse, time
-    start_time = time.time()
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--library_path', type=str, required=True, help="Path of the local library.")
-    args = parser.parse_args()
-
-    logging.basicConfig(filename='errors.log',
-                        filemode='a',
-                        format='%(asctime)s - %(levelname)s - %(message)s',
-                        level=logging.ERROR)
-
-    app_name, app_version, email, library_path = "Dig-for-Fire", "0.1", "dig4fire-mail@proton.me", os.path.abspath(args.library_path)
-
-    musicbrainz = MusicBrainz(app_name, app_version, email)
-    musicbrainz.fetch_library(library_path)
-    musicbrainz.add_album("The Rainbow Goblins", "Masayoshi Takanaka")
-    
-
-    '''
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--client_id', type=str, required=True, help="Spotify's client ID.")
-    parser.add_argument('--client_secret', type=str, required=True, help="Spotify's client's secret.")
-    parser.add_argument('--redirect_uri', type=str, required=True, help="Spotify's redirect URI. ")
-    args = parser.parse_args()
-    client_id, client_secret, redirect_uri = args.client_id, args.client_secret, args.redirect_uri
-
-    spotify = Spotify(client_id, client_secret, redirect_uri)
-    '''
-
-    end_time = time.time()
-    elapsed = end_time - start_time
-    print(f"Script ran in {elapsed:.2f} seconds")

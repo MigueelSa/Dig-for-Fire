@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "digforfire"
+version = "0.1.0"
+description = "Content-based music recommendation engine"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{name="Miguel Sá", email="miguel.bcmsa@proton.me"}]
+license = "MIT"
+
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.25",
+    "matplotlib>=3.8",
+    "scikit-learn>=1.3",
+    "tqdm>=4.67.1",
+    "spotipy>=2.25",
+    "musicbrainzngs>=0.7",
+    "networkx>=3.1",
+    "node2vec>=0.4.4",
+    "gensim>=4.3",
+    "sentence-transformers>=2.2.2"
+]
+
+[project.scripts]
+digforfire = "digforfire.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["digforfire*"]
+exclude = ["data*"]

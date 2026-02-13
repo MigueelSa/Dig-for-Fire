@@ -11,7 +11,7 @@ def resource_path(*parts: Any) -> str:
 
 def output_path(*parts: Any) -> str:
     if getattr(sys, "frozen", False):
-        base_dir = os.path.dirname(sys.executable)
+        base_dir = os.path.dirname(os.path.abspath(os.path.join(sys.executable, "..")))
     else:
         base_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 
