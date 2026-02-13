@@ -82,19 +82,14 @@ class Fetcher:
         while len(kept_albums) < k:
             message[0] = f"Fetching recommendations. {len(kept_albums)}/{k} albums found. {albums_looked} albums looked up."
 
-            #print("starts here")
             random_tokens = self.explorer._random_artist_genre_tag_generator(1)
-            #print("randomizer done")
             fetched_albums = self._fetch_albums(random_tokens, limit)
-            #print("fetch done")
             if not fetched_albums:
                 continue
             fetched_albums_gspace_matrix, fetched_albums_tspace_matrix = self._space_matrix(fetched_albums)
-            #print("space matrix done")
 
             genre_similarity_projections = cosine_similarity(fetched_albums_gspace_matrix, self.taste_gv)
             tag_similarity_projections = cosine_similarity(fetched_albums_tspace_matrix, self.taste_tv)
-            #print("similarity done")
             similarity_scores = self._similarity_scores(genre_similarity_projections, tag_similarity_projections)
 
             if self.predictor.is_safe:
@@ -108,7 +103,6 @@ class Fetcher:
                     kept_albums.append((album, similarity_score))
                     kept_ids.add(album_id)
                     self.excluded_albums.add(album_id)
-            #print("albums processed")
             albums_looked += len(fetched_albums)
         stop()
         df = pd.DataFrame(kept_albums, columns=["album", "score"])
