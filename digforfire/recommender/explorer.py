@@ -1,8 +1,8 @@
 import random
 from collections import Counter
 
-from utils.albums import get_album_genres, get_album_tags
-from models.models import LibraryData
+from digforfire.utils.albums import get_album_genres, get_album_tags
+from digforfire.models.models import LibraryData
 
 class Explorer:
     def __init__(self, library: LibraryData, roots: set[str], ancestors_children: dict[str, list[str]]):
@@ -107,7 +107,7 @@ class Explorer:
 
         return random.choices(similars, weights=weights, k=1)[0].get("name")
     
-    def _random_artist_genre_tag_generator(self, k: int, a_probability: float = 0.6, **kwargs) -> list[tuple[str, str]]:
+    def _random_artist_genre_tag_generator(self, k: int, a_probability: float = 1.0, **kwargs) -> list[tuple[str, str]]:
         if random.random() < a_probability:
             random_artist = self._random_artist_generator(k)
             if random_artist:

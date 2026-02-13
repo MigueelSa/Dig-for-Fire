@@ -1,6 +1,5 @@
-from libraries.libraries import MusicBrainz
-
-from utils.paths import output_path
+from digforfire.libraries.libraries import MusicBrainz
+from digforfire.utils.paths import output_path
 
 def add_album(title: str, artist: str, app_name: str, app_version: str, email: str) -> None:
     mb = MusicBrainz(app_name, app_version, email)

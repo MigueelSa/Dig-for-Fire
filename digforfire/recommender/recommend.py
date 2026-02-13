@@ -1,12 +1,12 @@
 import logging, time
 import os, json
-from libraries.libraries import MusicBrainz
 
-from models.models import LibraryData, MethodType
-from recommender.fetcher import Fetcher
-from utils.paths import output_path
-from embeddings.genre_space import GenreSpace
-from embeddings.tag_space import TagSpace
+from digforfire.libraries.libraries import MusicBrainz
+from digforfire.models.models import LibraryData, MethodType
+from digforfire.recommender.fetcher import Fetcher
+from digforfire.utils.paths import output_path
+from digforfire.embeddings.genre_space import GenreSpace
+from digforfire.embeddings.tag_space import TagSpace
 
 class Recommender:
 

@@ -4,8 +4,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
 
 
-from models.models import AlbumData, LibraryData, EmbeddingData
-from utils.paths import output_path
+from digforfire.models.models import AlbumData, LibraryData, EmbeddingData
+from digforfire.utils.paths import output_path
 
 class Predictor:
     def __init__(self, history: LibraryData, library: LibraryData, genre_embeddings: EmbeddingData, tag_embeddings: EmbeddingData, stratify: bool = True, n_estimators: int = 300, balanced: bool = False):
