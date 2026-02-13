@@ -10,34 +10,54 @@ It enriches a local album library with structured genre and tag information, bui
 ```
 Dig-for-Fire/
 │
-├── embeddings/
-│   ├── embeddings.py
-│   ├── genre_space.py
-│   └── tag_space.py
+├── digforfire/
+│   ├── __init__.py
+│   │
+│   ├── analysis/
+│   │   ├── __init__.py
+│   │   └── analysis.py
+│   │
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── albums.py
+│   │   ├── loading.py
+│   │   └── paths.py
+│   │
+│   ├── scripts/
+│   │   ├── __init__.py
+│   │   └── add_album.py
+│   │
+│   ├── embeddings/
+│   │   ├── __init__.py
+│   │   ├── embeddings.py
+│   │   ├── genre_space.py
+│   │   └── tag_space.py
+│   │
+│   ├── libraries/
+│   │   ├── __init__.py
+│   │   └── libraries.py
+│   │
+│   ├── ml/
+│   │   ├── __init__.py
+│   │   └── predictor.py
+│   │
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── models.py
+│   │
+│   ├── recommender/
+│   │   ├── __init__.py
+│   │   ├── explorer.py
+│   │   ├── fetcher.py
+│   │   └── recommend.py
+│   │
+│   └── tags/
+│       ├── __init__.py
+│       ├── tags.py
+│       └── MusicBrainz-genres_repo.json
 │
-├── libraries/
-│   └── libraries.py
-│
-├── recommender/
-│   ├── recommend.py
-│   ├── fetcher.py
-│   ├── explorer.py
-│   └── predictor.py
-│
-├── tags/
-│   └── tags.py
-│
-├── utils/
-│   ├── albums.py
-│   ├── paths.py
-│   └── loading.py
-│
-├── models/
-│   └── models.py
-│
-└── main.py
-
-
+├── requirements.txt
+└── README.md
 ```
 ---
 
