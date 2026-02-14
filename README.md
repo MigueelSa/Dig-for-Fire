@@ -244,13 +244,13 @@ GenreSpace      TagSpace
 
 ```bash
 git clone https://github.com/MigueelSa/dig-for-fire.git
-cd Dig-for-Fire
+cd dig-for-fire
 ```
 
 2. Create a virtual environment (Python ≥3.11)
 
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # Linux/macOS
 venv\Scripts\activate     # Windows
 ```
