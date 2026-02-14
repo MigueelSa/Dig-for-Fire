@@ -59,7 +59,7 @@ Dig-for-Fire/
 │
 ├── .gitignore
 ├── README.md
-└── requirements.txt
+└── pyproject.toml
 ```
 ---
 
@@ -258,19 +258,46 @@ venv\Scripts\activate     # Windows
 3. Install dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Usage
 
-```bash
-python main.py --library_path path/to/Spotify-Dig-for-Fire.json
-```
+| Flag | Arguments | Description | Example |
+|------|-----------|-------------|---------|
+| `--library_path` | Path to JSON library | Load a local library for enrichment | `--library_path=data/Spotify-Dig-for-Fire.json` |
+| `--client_id` | Spotify client ID | Required for importing library from Spotify | `--client_id=XXXX` |
+| `--client_secret` | Spotify client secret | Required for Spotify import | `--client_secret=XXXX` |
+| `--redirect_uri` | Spotify redirect URI | Required for Spotify import | `--redirect_uri=http://localhost:8888/callback` |
+| `--add_album` | TITLE ARTIST | Add a single album to the library | `--add_album "Lá Vem a Morte" "Boogarins"` |
+| `--recommend` | (no arguments) | Generate album recommendations | `--recommend` |
+| `--k` | Integer | Number of recommendations to generate (default 2) | `--recommend --k 5` |
 
 - The library file must be a JSON file containing your albums.
 
 **Note**: The first run may take a while due to MusicBrainz’s API rate limits. Subsequent runs are much faster.
 
+**Examples**
+
+1. Import Spotify library
+```python
+python main.py --client_id YOUR_ID --client_secret YOUR_SECRET --redirect_uri http://localhost:8888/callback
+```
+
+2. Enrich data with MusicBrainz
+```python
+python main.py --library_path data/Spotify-Dig-for-Fire.json
+```
+
+3. Fetch recommendations
+```python
+python main.py --recommend
+```
+
+4. Add albums to your library
+```python
+python main.py --add_album "Lá Vem a Morte" "Boogarins"
+```
 
 **Example JSON library**
 
@@ -307,12 +334,12 @@ pip install pyinstaller
 2. Build a single-file executable
 
 ```bash
-pyinstaller --onefile --add-data tags/MusicBrainz-genres_repo.json:tags --name dig-for-fire main.py
+pyinstaller --onefile --add-data tags/MusicBrainz-genres_repo.json:tags --name dig-for-fire digforfire/main.py
 ```
 3. After building, the executable will be in the `dist/` folder. Run it like this:
 
 ```bash
-./dist/dig-for-fire --library_path path/to/library.json
+./dist/dig-for-fire --flags-above
 ```
 
 - The executable will only work on the platform you built it on (Windows/Linux/macOS).
