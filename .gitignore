@@ -214,6 +214,7 @@ dist/data
 ideas.txt
 compile.sh
 run.sh
+gitdiff.txt
 
 # backups
 *safe*
