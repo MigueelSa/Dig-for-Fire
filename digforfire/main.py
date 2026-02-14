@@ -5,13 +5,12 @@ from digforfire.recommender.recommend import Recommender
 from digforfire.utils.paths import output_path
 from digforfire.scripts.import_spotify_library import import_spotify_library
 from digforfire.scripts.add_album import add_album
+from digforfire import config
 
 def main():
     parser = argparse.ArgumentParser(description="Dig-for-Fire: music recommendation engine")
     # spotify library import
-    parser.add_argument('--client_id', type=str, required=False, help="Spotify's client ID.")
-    parser.add_argument('--client_secret', type=str, required=False, help="Spotify's client's secret.")
-    parser.add_argument('--redirect_uri', type=str, required=False, help="Spotify's redirect URI. ")
+    parser.add_argument('--import_spotify', action="store_true", help="Import library from Spotify")
     # local library path
     parser.add_argument('--library_path', type=str, required=False, help="Path of the local library.")
     # add an album
@@ -27,15 +26,15 @@ def main():
                         format='%(asctime)s - %(levelname)s - %(message)s',
                         level=logging.ERROR)
 
-    app_name, app_version, email = "Dig-for-Fire", "0.1", "dig4fire-mail@proton.me"
+    app_name, app_version, email = config.APP_NAME, config.APP_VERSION, config.APP_EMAIL
     json_path = output_path("data", "MusicBrainz-Dig-for-Fire.json")
 
     if len(sys.argv) == 1:
         parser.print_help()
         return
 
-    if args.client_id and args.client_secret and args.redirect_uri:
-        client_id, client_secret, redirect_uri = args.client_id, args.client_secret, args.redirect_uri
+    if args.import_spotify:
+        client_id, client_secret, redirect_uri = config.SPOTIFY_CLIENT_ID, config.SPOTIFY_CLIENT_SECRET, config.SPOTIFY_REDIRECT_URI
         import_spotify_library(client_id, client_secret, redirect_uri)
         print("Library imported. If you want to enrich it with MusicBrainz run again with the option --library_path=data/Spotify-Dig-for-Fire.json")
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-import os, json, spotipy, math, logging, pickle, re, unicodedata
+import os, json, spotipy, math, logging, pickle, re, unicodedata, time
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
 import musicbrainzngs as mb
@@ -33,7 +33,7 @@ class Library(ABC):
             file_name = f"{self.platform}-Dig-for-Fire.json"
             output_file = os.path.join(save_dir, file_name)
             with open(output_file, "w") as f:
-                json.dump(self.library, f, indent=4)
+                json.dump(self.library, f, indent=4, ensure_ascii=False)
 
         file_name = f"{self.platform}-Dig-for-Fire.pkl"
         output_file = os.path.join(save_dir, file_name)
@@ -204,11 +204,13 @@ class MusicBrainz(Library):
 
             try:
                 result = mb.search_releases(artist=artist, release=name, limit=1)
+                time.sleep(1)
 
                 if result["release-list"]:
                     release = result["release-list"][0]
                     release_id = release["id"]
                     full = mb.get_release_by_id(release_id, includes=["tags", "release-groups", "artist-credits", "media"])
+                    time.sleep(1)
                     album_data = self._feed_release(full)
                     if local_id:
                         album_data["local_id"] = local_id

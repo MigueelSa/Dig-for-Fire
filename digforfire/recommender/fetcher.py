@@ -4,7 +4,6 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import musicbrainzngs as mb
 from sklearn.preprocessing import normalize
-from dotenv import load_dotenv
 
 from digforfire.embeddings.genre_space import GenreSpace
 from digforfire.embeddings.tag_space import TagSpace
@@ -14,6 +13,7 @@ from digforfire.utils.loading import loading_animation
 from digforfire.recommender.explorer import Explorer
 from digforfire.libraries.libraries import MusicBrainz
 from digforfire.utils.paths import output_path
+from digforfire import config
 
 class Fetcher:
     def __init__(self, library: dict[str, AlbumData], mb_library: MusicBrainz, genre_embeddings: GenreSpace, tag_embeddings: TagSpace, 
@@ -198,8 +198,8 @@ class Fetcher:
 
     
     def _fetch_similar(self, artist: list[str], limit: int = 100, sleep_time: float = 1.0) -> str | None:
-        load_dotenv()
-        api_key = os.getenv("LASTFM_KEY")
+        
+        api_key = config.LASTFM_API_KEY
         if not api_key:
             logging.warning(f"No Last.fm API key set. Skipping similar artist fetching.")
             return {}
