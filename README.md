@@ -281,22 +281,23 @@ pip install -e .
 
 1. Import Spotify library
 ```python
-python main.py --client_id YOUR_ID --client_secret YOUR_SECRET --redirect_uri http://localhost:8888/callback
+digforfire --client_id YOUR_ID --client_secret YOUR_SECRET --redirect_uri http://localhost:8888/callback
+
 ```
 
 2. Enrich data with MusicBrainz
 ```python
-python main.py --library_path data/Spotify-Dig-for-Fire.json
+digforfire --library_path data/Spotify-Dig-for-Fire.json
 ```
 
 3. Fetch recommendations
 ```python
-python main.py --recommend
+digforfire --recommend
 ```
 
 4. Add albums to your library
 ```python
-python main.py --add_album "Lá Vem a Morte" "Boogarins"
+digforfire --add_album "Lá Vem a Morte" "Boogarins"
 ```
 
 **Example JSON library**
