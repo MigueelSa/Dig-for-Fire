@@ -244,7 +244,7 @@ GenreSpace      TagSpace
 
 ```bash
 git clone https://github.com/MigueelSa/dig-for-fire.git
-cd dig-for-fire
+cd Dig-for-Fire
 ```
 
 2. Create a virtual environment (Python ≥3.11)
