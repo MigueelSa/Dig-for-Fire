@@ -18,9 +18,13 @@ def get_env(name: str) -> str:
 APP_NAME = get_env("APP_NAME")
 APP_VERSION = project["version"]
 APP_EMAIL = get_env("APP_EMAIL")
+APP_DESCRIPTION = project["description"]
 
 SPOTIFY_CLIENT_ID = get_env("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = get_env("SPOTIFY_CLIENT_SECRET")
 SPOTIFY_REDIRECT_URI = get_env("SPOTIFY_REDIRECT_URI")
 
 LASTFM_API_KEY = get_env("LASTFM_API_KEY")
+
+API_HOST = get_env("API_HOST")
+API_PORT = int(get_env("API_PORT"))

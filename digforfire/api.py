@@ -18,7 +18,7 @@ class AlbumResponse(BaseModel):
 class RecommendationResponse(BaseModel):
     recommendations: List[AlbumResponse]
 
-app = FastAPI()
+app = FastAPI(description=config.APP_DESCRIPTION)
 json_path = output_path("data", "MusicBrainz-Dig-for-Fire.json")
 email = config.APP_EMAIL
 
