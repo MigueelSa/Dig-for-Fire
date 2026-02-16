@@ -58,7 +58,10 @@ def main():
                 recommendations = rec.recommend()
                 sys.stdout.write('\r' + ' ' * 80 + '\r')
                 sys.stdout.flush()
-                print(recommendations)
+                output = ""
+                for ialbum,  album in enumerate(recommendations):
+                    output += f"{ialbum+1}. {album['title']} by {', '.join(album['artist'])}. Genres: {', '.join(album['genres'])}. Tags: {', '.join(album['tags'])}. Similarity score: {album['score']}.\n"
+                return output
 
 if __name__ == "__main__":
     main()

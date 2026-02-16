@@ -24,10 +24,7 @@ class Recommender:
     def recommend(self) -> str:
         top_albums = self.fetcher._fetch_recommendations()
         self._save_recommendations(top_albums)
-        output = ""
-        for ialbum,  album in enumerate(top_albums):
-            output += f"{ialbum+1}. {album['title']} by {', '.join(album['artist'])}. Genres: {', '.join(album['genres'])}. Tags: {', '.join(album['tags'])}. Similarity score: {album['score']}.\n"
-        return output
+        return top_albums
     
     def _save_recommendations(self, recommendations: LibraryData, output_path = output_path("data")) -> None:
         recommendation_history_path = os.path.abspath(os.path.join(output_path, "recommendation-history-Dig-for-Fire.json"))
