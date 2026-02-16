@@ -5,6 +5,114 @@ It enriches a local album library with structured genre and tag information, bui
 
 ---
 
+## Installation
+1. Clone the repo
+
+```bash
+git clone https://github.com/MigueelSa/dig-for-fire.git
+cd dig-for-fire
+```
+
+2. Create a virtual environment (Python ≥3.11)
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # Linux/macOS
+venv\Scripts\activate     # Windows
+```
+
+3. Install dependencies
+
+```bash
+pip install -e .
+```
+
+## Usage
+
+| Flag | Arguments | Description | Example |
+|------|-----------|-------------|---------|
+|`--import_spotify` | (no arguments) | Import Spotify Library | `--import_spotify` |
+| `--library_path` | Path to JSON library | Load a local library for enrichment | `--library_path=data/Spotify-Dig-for-Fire.json` |
+| `--add_album` | TITLE ARTIST | Add a single album to the library | `--add_album "Lá Vem a Morte" "Boogarins"` |
+| `--recommend` | (no arguments) | Generate album recommendations | `--recommend` |
+| `--k` | Integer | Number of recommendations to generate (default 2) | `--recommend --k 5` |
+
+- The library file must be a JSON file containing your albums.
+
+**Note**: The first run may take a while due to MusicBrainz’s API rate limits. Subsequent runs are much faster.
+
+**Examples**
+
+1. Enrich local library with MusicBrainz
+```python
+digforfire --library_path data/path/to/local/library.json
+```
+- **Optional**: Import Spotify library
+  - Copy `.env.example` to `.env` and fill in Spotify API values
+  - Run the command:
+```python
+digforfire --import_spotify
+```
+
+2. Fetch recommendations
+- Obtain a Last.fm API key and write it in `.env`
+- Run the command:
+```python
+digforfire --recommend
+```
+
+3. Add albums to your library
+```python
+digforfire --add_album "Lá Vem a Morte" "Boogarins"
+```
+
+**Example JSON library**
+
+**Minimal (only required fields)**
+
+```json
+[
+  {
+    "artist": ["Boogarins"],
+    "album": "Lá Vem a Morte"
+  },
+  {
+    "artist": ["Fausto"],
+    "album": "O despertar dos alquimistas"
+  },
+  {
+    "artist": ["Bob Dylan"],
+    "album": "New Morning"
+  }
+]
+```
+
+---
+
+Optional: Build standalone executable
+
+If you want to run Dig-for-Fire **without installing Python or dependencies**, you can create a standalone executable using PyInstaller.
+
+1. Install PyInstaller in your virtual environment
+
+```bash
+pip install pyinstaller
+```
+2. Build a single-file executable
+
+```bash
+pyinstaller --onefile --add-data tags/MusicBrainz-genres_repo.json:tags --name dig-for-fire digforfire/main.py
+```
+3. After building, the executable will be in the `dist/` folder. Run it like this:
+
+```bash
+./dist/dig-for-fire --flags-above
+```
+
+- The executable will only work on the platform you built it on (Windows/Linux/macOS).
+
+---
+
 ## Project structure
 
 ```
@@ -235,115 +343,6 @@ GenreSpace      TagSpace
           ↓
   Final Recommendations
 ```
-
-
----
-
-## Installation
-1. Clone the repo
-
-```bash
-git clone https://github.com/MigueelSa/dig-for-fire.git
-cd dig-for-fire
-```
-
-2. Create a virtual environment (Python ≥3.11)
-
-```bash
-python3 -m venv venv
-source venv/bin/activate  # Linux/macOS
-venv\Scripts\activate     # Windows
-```
-
-3. Install dependencies
-
-```bash
-pip install -e .
-```
-
-## Usage
-
-| Flag | Arguments | Description | Example |
-|------|-----------|-------------|---------|
-| `--library_path` | Path to JSON library | Load a local library for enrichment | `--library_path=data/Spotify-Dig-for-Fire.json` |
-| `--client_id` | Spotify client ID | Required for importing library from Spotify | `--client_id=XXXX` |
-| `--client_secret` | Spotify client secret | Required for Spotify import | `--client_secret=XXXX` |
-| `--redirect_uri` | Spotify redirect URI | Required for Spotify import | `--redirect_uri=http://localhost:8888/callback` |
-| `--add_album` | TITLE ARTIST | Add a single album to the library | `--add_album "Lá Vem a Morte" "Boogarins"` |
-| `--recommend` | (no arguments) | Generate album recommendations | `--recommend` |
-| `--k` | Integer | Number of recommendations to generate (default 2) | `--recommend --k 5` |
-
-- The library file must be a JSON file containing your albums.
-
-**Note**: The first run may take a while due to MusicBrainz’s API rate limits. Subsequent runs are much faster.
-
-**Examples**
-
-1. Import Spotify library
-```python
-digforfire --client_id YOUR_ID --client_secret YOUR_SECRET --redirect_uri http://localhost:8888/callback
-
-```
-
-2. Enrich data with MusicBrainz
-```python
-digforfire --library_path data/Spotify-Dig-for-Fire.json
-```
-
-3. Fetch recommendations
-```python
-digforfire --recommend
-```
-
-4. Add albums to your library
-```python
-digforfire --add_album "Lá Vem a Morte" "Boogarins"
-```
-
-**Example JSON library**
-
-**Minimal (only required fields)**
-
-```json
-[
-  {
-    "artist": ["Boogarins"],
-    "album": "Lá Vem a Morte"
-  },
-  {
-    "artist": ["Fausto"],
-    "album": "O despertar dos alquimistas"
-  },
-  {
-    "artist": ["Bob Dylan"],
-    "album": "New Morning"
-  }
-]
-```
-
----
-
-Optional: Build standalone executable
-
-If you want to run Dig-for-Fire **without installing Python or dependencies**, you can create a standalone executable using PyInstaller.
-
-1. Install PyInstaller in your virtual environment
-
-```bash
-pip install pyinstaller
-```
-2. Build a single-file executable
-
-```bash
-pyinstaller --onefile --add-data tags/MusicBrainz-genres_repo.json:tags --name dig-for-fire digforfire/main.py
-```
-3. After building, the executable will be in the `dist/` folder. Run it like this:
-
-```bash
-./dist/dig-for-fire --flags-above
-```
-
-- The executable will only work on the platform you built it on (Windows/Linux/macOS).
 
 ---
 
