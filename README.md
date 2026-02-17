@@ -89,30 +89,6 @@ digforfire --add_album "Lá Vem a Morte" "Boogarins"
 
 ---
 
-Optional: Build standalone executable
-
-If you want to run Dig-for-Fire **without installing Python or dependencies**, you can create a standalone executable using PyInstaller.
-
-1. Install PyInstaller in your virtual environment
-
-```bash
-pip install pyinstaller
-```
-2. Build a single-file executable
-
-```bash
-pyinstaller --onefile --add-data digforfire/tags/MusicBrainz-genres_repo.json:tags --name dig-for-fire digforfire/main.py
-```
-3. After building, the executable will be in the `dist/` folder. Run it like this:
-
-```bash
-./dist/dig-for-fire --flags-above
-```
-
-- The executable will only work on the platform you built it on (Windows/Linux/macOS).
-
----
-
 ## Project structure
 
 ```
