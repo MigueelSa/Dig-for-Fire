@@ -68,7 +68,7 @@ class Spotify(Library):
                 client_secret       =   client_secret,
                 redirect_uri        =   redirect_uri,
                 scope               =   "user-library-read",
-                requests_timeout    =   20
+                requests_timeout    =   30
         ))
 
         self.platform: LibraryType  =   "Spotify"
