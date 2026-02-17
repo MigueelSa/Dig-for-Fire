@@ -120,21 +120,12 @@ Dig-for-Fire/
 │
 ├── digforfire/
 │   ├── __init__.py
+|   ├── config.py
 |   ├── main.py
 │   │
 │   ├── analysis/
 │   │   ├── __init__.py
 │   │   └── analysis.py
-│   │
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── albums.py
-│   │   ├── loading.py
-│   │   └── paths.py
-│   │
-│   ├── scripts/
-│   │   ├── __init__.py
-│   │   └── add_album.py
 │   │
 │   ├── embeddings/
 │   │   ├── __init__.py
@@ -160,11 +151,23 @@ Dig-for-Fire/
 │   │   ├── fetcher.py
 │   │   └── recommend.py
 │   │
-│   └── tags/
+│   ├── scripts/
+│   │   ├── __init__.py
+│   │   ├── add_album.py
+│   │   └── import_spotify_library.py
+│   │
+│   ├── tags/
+│   │   ├── __init__.py
+│   │   ├── tags.py
+│   │   └── MusicBrainz-genres_repo.json
+│   │
+│   └── utils/
 │       ├── __init__.py
-│       ├── tags.py
-│       └── MusicBrainz-genres_repo.json
+│       ├── albums.py
+│       ├── loading.py
+│       └── paths.py
 │
+├── .env.example
 ├── .gitignore
 ├── README.md
 └── pyproject.toml
