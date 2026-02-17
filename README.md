@@ -101,7 +101,7 @@ pip install pyinstaller
 2. Build a single-file executable
 
 ```bash
-pyinstaller --onefile --add-data tags/MusicBrainz-genres_repo.json:tags --name dig-for-fire digforfire/main.py
+pyinstaller --onefile --add-data digforfire/tags/MusicBrainz-genres_repo.json:tags --name dig-for-fire digforfire/main.py
 ```
 3. After building, the executable will be in the `dist/` folder. Run it like this:
 
