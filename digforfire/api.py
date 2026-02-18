@@ -28,17 +28,18 @@ app = FastAPI(description=config.APP_DESCRIPTION)
 
 json_path = output_path("data", "MusicBrainz-Dig-for-Fire.json")
 email = config.APP_EMAIL
+rec = Recommender(json_path, email)
 
 @app.get("/recommend")
 def get_recommendations():
     try:
-        results = Recommender(json_path, email).recommend()
+        results = rec.recommend()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     clean = [
         AlbumResponse(id=album["id"], title=album["title"], artist=album["artist"], 
                     genres=list(album["genres"].keys()), tags=album["tags"], score=album["score"],
-                    cover_url=f"https://coverartarchive.org/release/{album['id']}/front-250")
+                    cover_url = f"https://coverartarchive.org/release-group/{album['id']}/front-250")
 
         for album in results
         ]

@@ -2,14 +2,16 @@
 <html>
 <head>
     <title>Dig-for-Fire</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <h1>Album Recommendations</h1>
 
     <button id="get-recommendations-btn">Get Recommendations</button>
 
-    <ul id="results"></ul>
+    <ul id="results" style="list-style-type: none; padding: 0; margin: 0;"></ul>
+    <div class="loader" style="display:none;"></div>
 
-    <script type="module" src="static/main.js"></script>
+    <script type="module" src="/static/main.js"></script>
 </body>
 </html>
