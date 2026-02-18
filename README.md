@@ -48,14 +48,14 @@ pip install -e .
 digforfire --library_path data/path/to/local/library.json
 ```
 - **Optional**: Import Spotify library
-  - Copy `.env.example` to `.env` and fill in Spotify API values
+  - Copy `.env.example` to `.env` and fill in Spotify API values (https://developer.spotify.com/documentation/web-api)
   - Run the command:
 ```python
 digforfire --import_spotify
 ```
 
 2. Fetch recommendations
-- Obtain a Last.fm API key and write it in `.env`
+- Obtain a Last.fm API key (https://www.last.fm/api) and write it in `.env`
 - Run the command:
 ```python
 digforfire --recommend
