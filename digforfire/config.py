@@ -28,3 +28,6 @@ LASTFM_API_KEY = get_env("LASTFM_API_KEY")
 
 API_HOST = get_env("API_HOST")
 API_PORT = int(get_env("API_PORT"))
+
+# --- contact info from pyproject.toml ---
+contact = pyproject.get("tool", {}).get("digforfire", {}).get("contact", {})

@@ -53,4 +53,4 @@ app.mount("/static", StaticFiles(directory=resource_path("digforfire", "static")
 
 @app.get("/", response_class=HTMLResponse)
 def homepage(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {"request": request, "contact": config.contact})
