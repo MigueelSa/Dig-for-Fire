@@ -1,0 +1,14 @@
+.results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+}
+
+.results-container {
+  height: 45rem;
+  overflow: auto;
+  background-color: aliceblue;
+}
