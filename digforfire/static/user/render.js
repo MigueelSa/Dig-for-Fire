@@ -1,5 +1,5 @@
-export function renderAlbums(albums) {
-  const resultsList = document.getElementById("results");
+export function renderAlbums(albums, containerId) {
+  const resultsList = document.getElementById(containerId);
   resultsList.innerHTML = "";
   albums.forEach((album) =>
     resultsList.appendChild(createAlbumListItem(album)),
@@ -8,6 +8,7 @@ export function renderAlbums(albums) {
 
 export function createAlbumListItem(album) {
   const li = document.createElement("li");
+  li.classList.add("album");
 
   if (album.cover_url) {
     const img = document.createElement("img");

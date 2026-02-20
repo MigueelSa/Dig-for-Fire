@@ -4,12 +4,28 @@
 <h1 style="text-align: center">Dig-for-Fire</h1>
 
 <div class="results-container">
-  <h2 style="text-align: center">Library</h2>
   <script type="module">
-    import { getLibrary } from "/static/library/library.js";
-    document.addEventListener("DOMContentLoaded", getLibrary);
+    import { getLibrary } from "/static/user/user.js";
+    document.addEventListener(
+      "DOMContentLoaded",
+      getLibrary("library-results"),
+    );
   </script>
-  <ul id="results" class="results"></ul>
+  <h2 style="text-align: center">Library</h2>
+  <ul id="library-results" class="results"></ul>
+</div>
+<br />
+
+<div class="results-container">
+  <script type="module">
+    import { getHistory } from "/static/user/user.js";
+    document.addEventListener(
+      "DOMContentLoaded",
+      getHistory("history-results"),
+    );
+  </script>
+  <h2 style="text-align: center">Recommendation History</h2>
+  <ul id="history-results" class="results"></ul>
 </div>
 <br />
 

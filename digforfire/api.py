@@ -63,6 +63,21 @@ def get_library():
     
     return LibraryResponse(library=clean)
 
+@app.get("/history")
+def get_library():
+    try:
+        results = rec.recommendation_history
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    clean = [
+        AlbumResponse(id=album["id"], title=album["title"], artist=album["artist"], 
+                    genres=list(album["genres"].keys()), tags=album["tags"], score=album["score"],
+                    cover_url = f"https://coverartarchive.org/release-group/{album['id']}/front-250")
+
+        for album in results
+        ]
+    
+    return LibraryResponse(library=clean)
 
 templates = Jinja2Templates(directory=resource_path("digforfire", "templates"))
 app.mount("/static", StaticFiles(directory=resource_path("digforfire", "static"), follow_symlink=True), name="static")
