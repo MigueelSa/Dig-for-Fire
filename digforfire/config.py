@@ -1,5 +1,5 @@
 import os, tomli
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from pathlib import Path
 
 pyproject_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
@@ -7,13 +7,21 @@ with pyproject_path.open("rb") as f:
     pyproject = tomli.load(f)
 project = pyproject["project"]
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+ENV_PATH=Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(ENV_PATH)
 
 def get_env(name: str) -> str:
     value = os.getenv(name)
     if not value:
         raise RuntimeError(f"Missing environment variable: {name}")
     return value
+
+def save_env(name: str, value: str):
+    ENV_PATH.parent.mkdir(exist_ok=True)
+    if not ENV_PATH.exists():
+        ENV_PATH.touch()
+    set_key(str(ENV_PATH), name, value)
+    os.environ[name] = value
 
 APP_NAME = get_env("APP_NAME")
 APP_VERSION = project["version"]

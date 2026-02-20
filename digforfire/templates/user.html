@@ -1,0 +1,15 @@
+<!doctype html>
+{% extends "style/master.html" %} {% block title %} Dig-for-Fire {% endblock %}
+{% block content %}
+<h1 style="text-align: center">Dig-for-Fire</h1>
+
+<div>
+  <script type="module">
+    import { getLibrary } from "/static/library/library.js";
+    document.addEventListener("DOMContentLoaded", getLibrary);
+  </script>
+  <ul id="results" style="list-style-type: none; padding: 0; margin: 10%"></ul>
+</div>
+<br />
+
+{% endblock %}

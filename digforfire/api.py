@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.requests import Request
@@ -18,11 +18,11 @@ class AlbumResponse(BaseModel):
     artist: list[str]
     genres: list[str]
     tags: list[str]
-    score: float
+    score: Optional[float] = 0.0
     cover_url: str
 
-class RecommendationResponse(BaseModel):
-    recommendations: List[AlbumResponse]
+class LibraryResponse(BaseModel):
+    library: List[AlbumResponse]
 
 app = FastAPI(description=config.APP_DESCRIPTION)
 
@@ -44,13 +44,33 @@ def get_recommendations():
         for album in results
         ]
     
-    return RecommendationResponse(recommendations=clean)
+    return LibraryResponse(library=clean)
     # Pydantic object → FastAPI automatically converts it to JSON string
+
+@app.get("/library")
+def get_library():
+    try:
+        results = rec.library
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    clean = [
+        AlbumResponse(id=album["id"], title=album["title"], artist=album["artist"], 
+                    genres=list(album["genres"].keys()), tags=album["tags"],
+                    cover_url = f"https://coverartarchive.org/release-group/{album['id']}/front-250")
+
+        for album in results
+        ]
+    
+    return LibraryResponse(library=clean)
 
 
 templates = Jinja2Templates(directory=resource_path("digforfire", "templates"))
-app.mount("/static", StaticFiles(directory=resource_path("digforfire", "static")))
+app.mount("/static", StaticFiles(directory=resource_path("digforfire", "static"), follow_symlink=True), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 def homepage(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "contact": config.contact})
+    return templates.TemplateResponse("recommend.html", {"request": request, "contact": config.contact})
+
+@app.get("/user", response_class=HTMLResponse)
+def userpage(request: Request):
+    return templates.TemplateResponse("user.html", {"request": request, "contact": config.contact})

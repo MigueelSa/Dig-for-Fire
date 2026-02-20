@@ -1,0 +1,23 @@
+<!doctype html>
+{% extends "style/master.html" %} {% block title %} Dig-for-Fire {% endblock %}
+{% block content %}
+<h1 style="text-align: center">Dig-for-Fire</h1>
+
+<div>
+  <script type="module">
+    import { getRecommendations } from "/static/recommend/recommend.js";
+    document
+      .getElementById("get-recommendations-btn")
+      .addEventListener("click", getRecommendations);
+  </script>
+
+  <button id="get-recommendations-btn">DIG</button>
+  <br />
+  <div class="loader" style="display: none"></div>
+  <br />
+  <ul id="results" style="list-style-type: none; padding: 0; margin: 10%"></ul>
+  <br />
+</div>
+<br />
+
+{% endblock %}
