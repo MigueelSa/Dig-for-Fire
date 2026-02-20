@@ -3,6 +3,19 @@
 {% block content %}
 <h1 style="text-align: center">Dig-for-Fire</h1>
 
+<div>
+  <script type="module">
+    import { importLibrary } from "/static/user/user.js";
+    document
+      .getElementById("import-library-btn")
+      .addEventListener("click", importLibrary);
+  </script>
+  <h2 style="text-align: center">Import Library</h2>
+  <input type="file" id="library-file" accept=".json" />
+  <button id="import-library-btn">Import Library</button>
+  <p id="import-status"></p>
+</div>
+
 <div class="results-container">
   <script type="module">
     import { getLibrary } from "/static/user/user.js";
