@@ -8,6 +8,7 @@ from musicbrainzngs import WebServiceError
 from digforfire.tags.tags import Tags
 from digforfire.models.models import AlbumData, LibraryData, LibraryType
 from digforfire.utils.paths import output_path
+from digforfire.utils.loading import ProgressTracker
 
 
 class Library(ABC):
@@ -58,6 +59,9 @@ class Library(ABC):
     
     def load_library(self, library_path: str) -> None:
         self.library = self._load_library(library_path)
+
+    def load_local_library(self, local_library_path: str) -> None:
+        self.local_library: LibraryData = self._load_library(local_library_path)
 
 class Spotify(Library):
 
@@ -174,7 +178,7 @@ class MusicBrainz(Library):
         return album
     
 
-    def fetch_library(self, local_library_path: str, batch_size: int = 50) -> None:
+    def fetch_library(self, local_library_path: str, batch_size: int = 50, mb_library_progress: ProgressTracker | None = None) -> None:
         self.local_library = self._load_library(local_library_path)
 
         pickle_file = os.path.join(self.save_dir, f"{self.platform}-Dig-for-Fire.pkl")
@@ -185,12 +189,13 @@ class MusicBrainz(Library):
         else:
             self.library = []
 
-        self._fetch_library(batch_size=batch_size)
+        self._fetch_library(batch_size=batch_size, mb_library_progress = mb_library_progress)
         self._save_library()
 
 
     def _fetch_library(self, **kwargs) -> None:
-        batch_size = kwargs.get("batch_size", 50)
+        batch_size: int = kwargs.get("batch_size", 50)
+        mb_library_progress: ProgressTracker | None = kwargs.get("mb_library_progress", None)
         assert self.local_library is not None
         library = self.library
         existing_albums = {album.get("local_id") for album in library if album.get("local_id")}
@@ -228,6 +233,9 @@ class MusicBrainz(Library):
             if (ialbum+1) % batch_size == 0:
                 self.library = library
                 self._save_library(write_json=False)
+
+            if mb_library_progress:
+                mb_library_progress.update(ialbum+1)
 
         self.library = library
 

@@ -12,7 +12,11 @@ export async function fetchLibrary() {
 export async function fetchHistory() {
   try {
     const response = await fetch("/history");
+    console.log("History response status:", response.status);
+
     const result = await response.json();
+    console.log("History raw JSON:", result);
+
     return result;
   } catch (error) {
     console.error("Error fetching history:", error);
