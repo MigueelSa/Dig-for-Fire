@@ -11,7 +11,7 @@ from digforfire.recommender.history import HistoryManager
 
 class Recommender:
 
-    def __init__(self, library_path: str, email: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 10, threshold: float = 0.6, 
+    def __init__(self, library_path: str, email: str, lastfm_api_key: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 10, threshold: float = 0.6, 
                  method: MethodType = "pmi", n_clusters: int = 50):
         self.mb_library: MusicBrainz                                                            =   MusicBrainz(app_name, app_version, email)
         self.library: LibraryData                                                               =   self.mb_library._load_library(library_path)
@@ -21,9 +21,10 @@ class Recommender:
         self.recommendation_history: LibraryData                                                =   HistoryManager.load_recommendations()
         self.fetcher: Fetcher                                                                   =   Fetcher(self.library, self.mb_library, self.genre_embeddings, self.tag_embeddings, 
                                                                                                             self.recommendation_history, k, limit, threshold)
+        self.lastfm_api_key                                                                     =   lastfm_api_key
     
     def recommend(self) -> str:
-        top_albums = self.fetcher._fetch_recommendations()
+        top_albums = self.fetcher._fetch_recommendations(self.lastfm_api_key)
         self._save_recommendations(top_albums)
         return top_albums
     
@@ -38,6 +39,7 @@ class Recommender:
     
 if __name__ == "__main__":
     import argparse, time
+    from digforfire.config import config
 
     logging.basicConfig(filename='errors.log',
                         filemode='a',
@@ -52,7 +54,7 @@ if __name__ == "__main__":
 
     library, email = os.path.abspath(args.library_path), args.email
 
-    rec = Recommender(library, email)
+    rec = Recommender(library, email, config.LASTFM_API_KEY)
     recommendations = rec.recommend()
     print(recommendations)
 

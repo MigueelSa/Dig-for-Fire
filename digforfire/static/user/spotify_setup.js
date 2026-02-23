@@ -8,7 +8,7 @@ export async function saveSpotifyCredentials(form) {
     body: JSON.stringify({
       client_id: formData.get("client_id"),
       client_secret: formData.get("client_secret"),
-      redirect_uri: formData.get("redirect_uri"),
+      lastfm_api_key: formData.get("lastfm_api_key"),
     }),
     headers: { "Content-Type": "application/json" },
   });

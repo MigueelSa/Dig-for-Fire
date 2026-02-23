@@ -5,7 +5,7 @@ from digforfire.recommender.recommend import Recommender
 from digforfire.utils.paths import output_path
 from digforfire.scripts.import_spotify_library import import_spotify_library
 from digforfire.scripts.add_album import add_album
-from digforfire import config
+from digforfire.config import config
 
 def main():
     parser = argparse.ArgumentParser(description="Dig-for-Fire: music recommendation engine")
@@ -54,7 +54,7 @@ def main():
 
             if args.recommend:
                 k = args.k
-                rec = Recommender(json_path, email, k=k)
+                rec = Recommender(json_path, email, config.LASTFM_API_KEY, k=k)
                 recommendations = rec.recommend()
                 sys.stdout.write('\r' + ' ' * 80 + '\r')
                 sys.stdout.flush()

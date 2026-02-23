@@ -12,7 +12,15 @@
 />
 
 <div class="contact-us">
-  <p><i class="fa fa-envelope"></i> Email: {{ contact.email }}</p>
+  <p>
+    <i class="fa fa-envelope"></i> Email:
+    <a
+      href="mailto:{{ contact.email }}"
+      target="_blank"
+      rel="noopener noreferrer"
+      >{{ contact.email }}</a
+    >
+  </p>
   <p><i class="fa fa-phone"></i> Phone: {{ contact.phone }}</p>
   <p>
     <i class="fa fa-github"></i> Github:

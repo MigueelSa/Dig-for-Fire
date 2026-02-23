@@ -6,12 +6,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.requests import Request
 from fastapi.templating import Jinja2Templates
 import os, uuid
+from dotenv import load_dotenv
 
 from digforfire.recommender.recommend import Recommender
 from digforfire.utils.paths import output_path, resource_path
 from digforfire.utils.loading import ProgressTracker
 from digforfire.libraries.libraries import MusicBrainz, Spotify
-from digforfire import config
+from digforfire.config import config_api, config_base
 from digforfire.recommender.history import HistoryManager
 
 class AlbumResponse(BaseModel):
@@ -26,20 +27,19 @@ class AlbumResponse(BaseModel):
 class LibraryResponse(BaseModel):
     library: List[AlbumResponse]
 
-app = FastAPI(description=config.APP_DESCRIPTION)
+app = FastAPI(description=config_api.APP_DESCRIPTION)
 
-app_name = config.APP_NAME
-app_version = config.APP_VERSION
 json_path = output_path("data", "MusicBrainz-Dig-for-Fire.json")
-email = config.APP_EMAIL
 
 tasks: dict[str, ProgressTracker] = {}
 
 
 @app.get("/recommend")
 def get_recommendations():
+    if not os.path.exists(json_path):
+        RedirectResponse(url="/user")
     try:
-        rec = Recommender(json_path, email)
+        rec = Recommender(json_path, config_api.APP_EMAIL, config_api.LASTFM_API_KEY)
         results = rec.recommend()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -57,7 +57,7 @@ def get_recommendations():
 @app.get("/library")
 def get_library():
     try:
-        rec = Recommender(json_path, email)
+        rec = Recommender(json_path, config_api.APP_EMAIL, config_api.LASTFM_API_KEY)
         results = rec.library
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -94,7 +94,7 @@ async def enrich_library(file: UploadFile = File(...), background_tasks: Backgro
     with open(library_path, "wb") as f:
         f.write(content)
     
-    mb = MusicBrainz(app_name=app_name, app_version=app_version, email=email)
+    mb = MusicBrainz(app_name=config_api.APP_NAME, app_version=config_api.APP_VERSION, email=config_api.APP_EMAIL)
     mb.load_local_library(library_path)
 
     task_id = str(uuid.uuid4())
@@ -121,26 +121,27 @@ def get_progress(task_id: str):
 @app.post("/user/spotify/save-credentials")
 async def save_spotify_credentials(request: Request):
     data = await request.json()
-    client_id, client_secret, redirect_uri = data.get("client_id"), data.get("client_secret"), data.get("redirect_uri")
+    client_id, client_secret, lastfm_api_key = data.get("client_id"), data.get("client_secret"), data.get("lastfm_api_key")
 
-    if not os.path.exists(config.ENV_PATH):
-        with open(config.ENV_PATH, "w") as f: f.write("")
+    if not os.path.exists(config_base.ENV_PATH):
+        with open(config_base.ENV_PATH, "w") as f: f.write("")
     
-    if client_id and client_secret and redirect_uri:
-        config.save_env("SPOTIFY_CLIENT_ID", client_id)
-        config.save_env("SPOTIFY_CLIENT_SECRET", client_secret)
-        config.save_env("SPOTIFY_REDIRECT_URI", redirect_uri)
+    if client_id and client_secret and lastfm_api_key:
+        config_base.save_env("SPOTIFY_CLIENT_ID", client_id)
+        config_base.save_env("SPOTIFY_CLIENT_SECRET", client_secret)
+        config_base.save_env("LASTFM_API_KEY", lastfm_api_key)
 
 @app.get("/user/spotify/credentials-check")
 def spotify_credentials_check():
-    ok = bool(config.SPOTIFY_CLIENT_ID and config.SPOTIFY_CLIENT_SECRET and config.SPOTIFY_REDIRECT_URI)
+    load_dotenv(config_base.ENV_PATH, override=True)
+    config_api.SPOTIFY_CLIENT_ID, config_api.SPOTIFY_CLIENT_SECRET, config_api.SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_CLIENT_ID"), os.getenv("SPOTIFY_CLIENT_SECRET"), os.getenv("SPOTIFY_REDIRECT_URI")
+    ok = bool(config_api.SPOTIFY_CLIENT_ID and config_api.SPOTIFY_CLIENT_SECRET and config_api.SPOTIFY_REDIRECT_URI)
     return {"ok": ok}
     
 @app.get("/user/spotify/import-library")
 def import_spotify_library():
-    spotify = Spotify(config.SPOTIFY_CLIENT_ID, config.SPOTIFY_CLIENT_SECRET, config.SPOTIFY_REDIRECT_URI)
+    spotify = Spotify(config_api.SPOTIFY_CLIENT_ID, config_api.SPOTIFY_CLIENT_SECRET, config_api.SPOTIFY_REDIRECT_URI)
     spotify.fetch_library()
-
 
 
 templates = Jinja2Templates(directory=resource_path("digforfire", "templates"))
@@ -149,14 +150,14 @@ app.mount("/static", StaticFiles(directory=resource_path("digforfire", "static")
 @app.get("/", response_class=HTMLResponse)
 def homepage(request: Request):
     if os.path.exists(json_path):
-        return templates.TemplateResponse("recommend.html", {"request": request, "contact": config.contact})
+        return templates.TemplateResponse("recommend.html", {"request": request, "contact": config_base.contact})
     else:
         return RedirectResponse(url="/user")
 
 @app.get("/user", response_class=HTMLResponse)
 def userpage(request: Request):
-    return templates.TemplateResponse("user.html", {"request": request, "contact": config.contact})
+    return templates.TemplateResponse("user.html", {"request": request, "contact": config_base.contact})
 
 @app.get("/user/spotify/setup", response_class=HTMLResponse)
 def userpage(request: Request):
-    return templates.TemplateResponse("spotify_setup.html", {"request": request, "contact": config.contact})
+    return templates.TemplateResponse("spotify_setup.html", {"request": request, "contact": config_base.contact})
