@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <title>{% block title %}{% endblock %}</title>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        margin: 0;
+        font-family:
+          Comic Sans MS,
+          cursive,
+          sans-serif;
+        background-color: #ffffff;
+        color: rgb(0, 0, 0);
+      }
+      .content-wrapper {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        width: 100%;
+      }
+      div {
+        text-align: center;
+      }
+    </style>
+    <link rel="stylesheet" href="/static/style/results.css" />
+    <link rel="stylesheet" href="/static/style/loader.css" />
+    <link rel="stylesheet" href="/static/style/album.css" />
+  </head>
+  {% include "style/hamburger_menu.html" %}
+  <body>
+    <div class="content-wrapper">
+      {% block content %} {% endblock %} {% include "style/contact.html" %}
+    </div>
+  </body>
+</html>

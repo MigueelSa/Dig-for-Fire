@@ -13,7 +13,6 @@ from digforfire.utils.loading import loading_animation
 from digforfire.recommender.explorer import Explorer
 from digforfire.libraries.libraries import MusicBrainz
 from digforfire.utils.paths import output_path
-from digforfire import config
 
 class Fetcher:
     def __init__(self, library: dict[str, AlbumData], mb_library: MusicBrainz, genre_embeddings: GenreSpace, tag_embeddings: TagSpace, 
@@ -40,12 +39,12 @@ class Fetcher:
 
             return title, artist, date, album_id
     
-    def _fetch_albums(self, tokens: list[tuple[str, str]], limit: int) -> LibraryData:
+    def _fetch_albums(self, tokens: list[tuple[str, str]], api_key: str, limit: int) -> LibraryData:
         fetched_albums = {}
         for token, token_type in tokens:
             try:
                 if token_type == "artist":
-                    artist = self._fetch_similar([token], limit=limit)
+                    artist = self._fetch_similar([token], api_key, limit=limit)
                     if not artist:
                         continue
                     result = mb.search_releases(query=f'artist:{artist} AND primarytype:album', limit=limit)
@@ -73,7 +72,7 @@ class Fetcher:
 
         return list(fetched_albums.values())
     
-    def _fetch_recommendations(self) -> LibraryData:
+    def _fetch_recommendations(self, api_key: str) -> LibraryData:
         k, limit, threshold = self.k, self.limit, self.threshold
         kept_albums, kept_ids = [], set()
         albums_looked = 0
@@ -83,7 +82,7 @@ class Fetcher:
             message[0] = f"Fetching recommendations. {len(kept_albums)}/{k} albums found. {albums_looked} albums looked up."
 
             random_tokens = self.explorer._random_artist_genre_tag_generator(1)
-            fetched_albums = self._fetch_albums(random_tokens, limit)
+            fetched_albums = self._fetch_albums(random_tokens, api_key, limit)
             if not fetched_albums:
                 continue
             fetched_albums_gspace_matrix, fetched_albums_tspace_matrix = self._space_matrix(fetched_albums)
@@ -197,9 +196,7 @@ class Fetcher:
         
 
     
-    def _fetch_similar(self, artist: list[str], limit: int = 100, sleep_time: float = 1.0) -> str | None:
-        
-        api_key = config.LASTFM_API_KEY
+    def _fetch_similar(self, artist: list[str], api_key:str, limit: int = 100, sleep_time: float = 1.0) -> str | None:
         if not api_key:
             logging.warning(f"No Last.fm API key set. Skipping similar artist fetching.")
             return {}

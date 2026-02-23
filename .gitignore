@@ -210,11 +210,8 @@ __marimo__/
 data/
 dist/data
 
-# random files
-ideas.txt
-compile.sh
-run.sh
-gitdiff.txt
+# txt files
+*.txt
 
 # backups
 *safe*

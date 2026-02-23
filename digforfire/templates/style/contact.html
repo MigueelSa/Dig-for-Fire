@@ -1,0 +1,45 @@
+<style>
+  .contact-us {
+    background-color: rgb(196, 225, 250);
+    text-align: center;
+    bottom: 0;
+  }
+</style>
+
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+/>
+
+<div class="contact-us">
+  <p>
+    <i class="fa fa-envelope"></i> Email:
+    <a
+      href="mailto:{{ contact.email }}"
+      target="_blank"
+      rel="noopener noreferrer"
+      >{{ contact.email }}</a
+    >
+  </p>
+  <p><i class="fa fa-phone"></i> Phone: {{ contact.phone }}</p>
+  <p>
+    <i class="fa fa-github"></i> Github:
+    <a
+      href="https://{{ contact.github }}"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {{ contact.github }}</a
+    >
+  </p>
+  <p>
+    <i class="fa fa-linkedin"></i> Linkedin:
+    <a
+      href="https://{{ contact.linkedin }}"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {{ contact.linkedin }}</a
+    >
+  </p>
+</div>

@@ -1,0 +1,49 @@
+<!doctype html>
+{% extends "style/master.html" %} {% block title %} Dig-for-Fire {% endblock %}
+{% block content %}
+<h1 style="text-align: center">Dig-for-Fire</h1>
+
+<div>
+  <script type="module">
+    import { saveSpotifyCredentials } from "/static/user/spotify_setup.js";
+
+    document.getElementById("spotify-form").onsubmit = (e) => {
+      e.preventDefault();
+      saveSpotifyCredentials(e.target);
+
+      window.location.href = "/user/";
+    };
+  </script>
+
+  <form id="spotify-form">
+    <label
+      >Client ID:<br />
+      <input type="text" name="client_id" required /> </label
+    ><br /><br />
+
+    <label
+      >Client Secret:<br />
+      <input type="text" name="client_secret" required /> </label
+    ><br /><br />
+
+    <label
+      >Last FM API Key:<br />
+      <input type="text" name="lastfm_api_key" required /> </label
+    ><br /><br />
+
+    <button type="submit">Save Credentials</button>
+  </form>
+
+  <p>
+    If you do not have these credentials, you can set them in
+    <a
+      href="https://developer.spotify.com/documentation/web-api"
+      target="_blank"
+      >Spotify</a
+    >
+    and <a href="https://www.last.fm/api" target="_blank">LastFM</a>.
+  </p>
+</div>
+<br />
+
+{% endblock %}

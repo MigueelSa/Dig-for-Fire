@@ -8,6 +8,7 @@ from musicbrainzngs import WebServiceError
 from digforfire.tags.tags import Tags
 from digforfire.models.models import AlbumData, LibraryData, LibraryType
 from digforfire.utils.paths import output_path
+from digforfire.utils.loading import ProgressTracker
 
 
 class Library(ABC):
@@ -19,11 +20,6 @@ class Library(ABC):
         self.local_library: LibraryData | None  =   None
 
         self.save_dir                           =   output_path("data")
-
-    @abstractmethod
-    def _fetch_library(self, **kwargs) -> None:
-        """Fetch albums from the platform and saves it to JSON file."""
-        pass
 
     def _save_library(self, write_json=True) -> None:
         save_dir = self.save_dir
@@ -59,6 +55,9 @@ class Library(ABC):
     def load_library(self, library_path: str) -> None:
         self.library = self._load_library(library_path)
 
+    def load_local_library(self, local_library_path: str) -> None:
+        self.local_library: LibraryData = self._load_library(local_library_path)
+
 class Spotify(Library):
 
     def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
@@ -73,7 +72,6 @@ class Spotify(Library):
 
         self.platform: LibraryType  =   "Spotify"
         self.limit                  =       50
-        self._fetch_library()
 
     def _feed_release(self, data: AlbumData) -> AlbumData:
         # id
@@ -98,12 +96,12 @@ class Spotify(Library):
 
         return album
 
-    def _fetch_library(self, **kwargs) -> None:
+    def _fetch_library(self) -> None:
         albums = []
         results = self.sp.current_user_saved_albums(limit=self.limit)
         num_albums = results['total']
         num_pages = math.ceil(num_albums / self.limit)
-        for _ in tqdm(range(num_pages), desc="Going through albums...", leave=False):
+        for i in tqdm(range(num_pages), desc="Going through albums...", leave=False):
             for item in results['items']:
                 album = self._feed_release(item["album"])
                 albums.append(album)
@@ -115,6 +113,9 @@ class Spotify(Library):
 
         self.library = albums
         self._save_library()
+
+    def fetch_library(self) -> None:
+        self._fetch_library()
 
 
 
@@ -174,7 +175,7 @@ class MusicBrainz(Library):
         return album
     
 
-    def fetch_library(self, local_library_path: str, batch_size: int = 50) -> None:
+    def fetch_library(self, local_library_path: str, progress: ProgressTracker | None = None, batch_size: int = 50) -> None:
         self.local_library = self._load_library(local_library_path)
 
         pickle_file = os.path.join(self.save_dir, f"{self.platform}-Dig-for-Fire.pkl")
@@ -185,12 +186,11 @@ class MusicBrainz(Library):
         else:
             self.library = []
 
-        self._fetch_library(batch_size=batch_size)
+        self._fetch_library(batch_size=batch_size, progress = progress)
         self._save_library()
 
 
-    def _fetch_library(self, **kwargs) -> None:
-        batch_size = kwargs.get("batch_size", 50)
+    def _fetch_library(self, progress: ProgressTracker | None = None, batch_size: int = 50) -> None:
         assert self.local_library is not None
         library = self.library
         existing_albums = {album.get("local_id") for album in library if album.get("local_id")}
@@ -228,6 +228,9 @@ class MusicBrainz(Library):
             if (ialbum+1) % batch_size == 0:
                 self.library = library
                 self._save_library(write_json=False)
+
+            if progress:
+                progress.update(ialbum+1)
 
         self.library = library
 

@@ -1,0 +1,67 @@
+<!doctype html>
+{% extends "style/master.html" %} {% block title %} Dig-for-Fire {% endblock %}
+{% block content %}
+<h1 style="text-align: center">Dig-for-Fire</h1>
+
+<div>
+  <script type="module">
+    import {
+      getHistory,
+      importLibrary,
+      getLibrary,
+      pollProgress,
+    } from "/static/user/user.js";
+
+    import { checkSpotifyCredentials } from "/static/user/spotify_setup.js";
+
+    document
+      .getElementById("enrich-library-btn")
+      .addEventListener("click", () => {
+        importLibrary("mb-progress-bar", "enrichment-status");
+      });
+
+    document
+      .getElementById("import-spotify-btn")
+      .addEventListener("click", () => {
+        checkSpotifyCredentials();
+      });
+
+    getLibrary("library-results");
+
+    getHistory("history-results");
+  </script>
+</div>
+
+<div>
+  <h2 style="text-align: center">Import Local Library</h2>
+  <input type="file" id="library-file" accept=".json" />
+
+  <button id="enrich-library-btn">Enrich Library</button>
+  <p id="enrichment-status"></p>
+  <progress id="mb-progress-bar" max="100" value="0"></progress>
+</div>
+<br />
+
+<div>
+  <h2 style="text-align: center">Import Library from Spotify</h2>
+
+  <button id="import-spotify-btn">Import Spotify</button>
+  <br />
+  <div class="loader" style="display: none"></div>
+  <br />
+</div>
+<br />
+
+<div class="results-container">
+  <h2 style="text-align: center">Library</h2>
+  <ul id="library-results" class="results"></ul>
+</div>
+<br />
+
+<div class="results-container">
+  <h2 style="text-align: center">Recommendation History</h2>
+  <ul id="history-results" class="results"></ul>
+</div>
+<br />
+
+{% endblock %}

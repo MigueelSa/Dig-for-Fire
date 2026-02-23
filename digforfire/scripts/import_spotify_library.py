@@ -1,7 +1,8 @@
 from digforfire.libraries.libraries import Spotify
 
 def import_spotify_library(client_id: str, client_secret:str, redirect_uri) -> None:
-    Spotify(client_id, client_secret, redirect_uri)
+    spotify = Spotify(client_id, client_secret, redirect_uri)
+    spotify.fetch_library()
 
 
 if __name__ == "__main__":

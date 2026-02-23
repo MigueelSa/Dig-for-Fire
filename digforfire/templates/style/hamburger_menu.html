@@ -1,0 +1,40 @@
+<style>
+    .menu-container {
+    display: inline-block;
+    position: fixed; /* keeps it in place while scrolling */
+    z-index: 1000; /* ensures it stays on top */
+    }
+    .hamburger {
+    font-size: 50px;
+    cursor: pointer;
+    user-select: none;
+    }
+    .menu-items {
+    display: none; /* hidden by default */
+    top: 40px;  /* below the hamburger */
+    padding: 10px;
+    left: 0;
+    background-color: #ffffff55;
+    width: 50px;
+    height: 100vh;
+    position: fixed;   /* fixes it relative to the viewport */
+    list-style: none; /* removes bullets */
+    }
+</style>
+<div class="menu-container">
+    <div class="hamburger" onclick="toggleMenu()" style="color: rgb(0, 0, 0);">☰</div>
+    <ul class="menu-items" id="menu">
+        <li><a href="/">Recommendations</a></li>
+        <li><a href="/user">User</a></li>
+    </ul>
+</div>
+<script>
+    function toggleMenu() {
+        var menu = document.getElementById("menu");
+        if (menu.style.display === "block") {
+            menu.style.display = "none";
+        } else {
+            menu.style.display = "block";
+        }
+    }
+</script>

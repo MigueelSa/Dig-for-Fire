@@ -25,12 +25,23 @@ dependencies = [
     "sentence-transformers>=2.2.2",
     "python-dotenv>=1.0",
     "tomli>=2.0.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.6.0",
+    "python-multipart>=0.0.7"
 ]
 
 [project.scripts]
 digforfire = "digforfire.main:main"
+digforfire-api = "digforfire.scripts.run_api:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["digforfire*"]
 exclude = ["data*"]
+
+[tool.digforfire.contact]
+email="miguel.bcmsa@proton.me"
+phone="+34 684 75 99 38"
+github="github.com/MigueelSa"
+linkedin="linkedin.com/in/miguel-sa-47077023b"
