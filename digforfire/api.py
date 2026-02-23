@@ -39,6 +39,8 @@ def get_recommendations():
     if not os.path.exists(json_path):
         RedirectResponse(url="/user")
     try:
+        load_dotenv(config_base.ENV_PATH, override=True)
+        config_api.LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
         rec = Recommender(json_path, config_api.APP_EMAIL, config_api.LASTFM_API_KEY)
         results = rec.recommend()
     except Exception as e:
@@ -134,8 +136,8 @@ async def save_spotify_credentials(request: Request):
 @app.get("/user/spotify/credentials-check")
 def spotify_credentials_check():
     load_dotenv(config_base.ENV_PATH, override=True)
-    config_api.SPOTIFY_CLIENT_ID, config_api.SPOTIFY_CLIENT_SECRET, config_api.SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_CLIENT_ID"), os.getenv("SPOTIFY_CLIENT_SECRET"), os.getenv("SPOTIFY_REDIRECT_URI")
-    ok = bool(config_api.SPOTIFY_CLIENT_ID and config_api.SPOTIFY_CLIENT_SECRET and config_api.SPOTIFY_REDIRECT_URI)
+    config_api.SPOTIFY_CLIENT_ID, config_api.SPOTIFY_CLIENT_SECRET, config_api.LASTFM_API_KEY = os.getenv("SPOTIFY_CLIENT_ID"), os.getenv("SPOTIFY_CLIENT_SECRET"), os.getenv("LASTFM_API_KEY")
+    ok = bool(config_api.SPOTIFY_CLIENT_ID and config_api.SPOTIFY_CLIENT_SECRET and config_api.LASTFM_API_KEY)
     return {"ok": ok}
     
 @app.get("/user/spotify/import-library")
