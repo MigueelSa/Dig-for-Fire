@@ -18,12 +18,20 @@ export function createAlbumListItem(album) {
     li.appendChild(img);
   }
 
+  let scoreHTML = "";
+  if (album.score !== undefined && album.score > 0) {
+    scoreHTML = `
+      Score: ${album.score.toFixed(5)}<br>
+    `;
+  }
+
   const info = document.createElement("div");
   info.innerHTML = `
                         <strong>${album.title}</strong><br>
                         Artist: ${album.artist.join(", ")}<br>
                         Genres: ${album.genres.join(", ")}<br>
                         Tags: ${album.tags.join(", ")}<br>
+                        ${scoreHTML}
                         <br>
                     `;
 

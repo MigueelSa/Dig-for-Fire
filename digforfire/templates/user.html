@@ -12,30 +12,45 @@
       pollProgress,
     } from "/static/user/user.js";
 
+    import { checkSpotifyCredentials } from "/static/user/spotify_setup.js";
+
     document
       .getElementById("enrich-library-btn")
-      .addEventListener("click", importLibrary);
+      .addEventListener("click", () => {
+        importLibrary("mb-progress-bar", "enrichment-status");
+      });
 
-    document.addEventListener(
-      "DOMContentLoaded",
-      getLibrary("library-results"),
-    );
+    document
+      .getElementById("import-spotify-btn")
+      .addEventListener("click", () => {
+        checkSpotifyCredentials();
+      });
 
-    document.addEventListener(
-      "DOMContentLoaded",
-      getHistory("history-results"),
-    );
+    getLibrary("library-results");
+
+    getHistory("history-results");
   </script>
 </div>
 
 <div>
-  <h2 style="text-align: center">Import Library</h2>
+  <h2 style="text-align: center">Import Local Library</h2>
   <input type="file" id="library-file" accept=".json" />
 
   <button id="enrich-library-btn">Enrich Library</button>
-  <p id="import-status"></p>
-  <progress id="progress-bar" max="100" value="0"></progress>
+  <p id="enrichment-status"></p>
+  <progress id="mb-progress-bar" max="100" value="0"></progress>
 </div>
+<br />
+
+<div>
+  <h2 style="text-align: center">Import Library from Spotify</h2>
+
+  <button id="import-spotify-btn">Import Spotify</button>
+  <br />
+  <div class="loader" style="display: none"></div>
+  <br />
+</div>
+<br />
 
 <div class="results-container">
   <h2 style="text-align: center">Library</h2>

@@ -1,0 +1,39 @@
+<!doctype html>
+{% extends "style/master.html" %} {% block title %} Dig-for-Fire {% endblock %}
+{% block content %}
+<h1 style="text-align: center">Dig-for-Fire</h1>
+
+<div>
+  <script type="module">
+    import { saveSpotifyCredentials } from "/static/user/spotify_setup.js";
+
+    document.getElementById("spotify-form").onsubmit = (e) => {
+      e.preventDefault();
+      saveSpotifyCredentials(e.target);
+
+      window.location.href = "/user/";
+    };
+  </script>
+
+  <form id="spotify-form">
+    <label
+      >Client ID:<br />
+      <input type="text" name="client_id" required /> </label
+    ><br /><br />
+
+    <label
+      >Client Secret:<br />
+      <input type="text" name="client_secret" required /> </label
+    ><br /><br />
+
+    <label
+      >Redirect URI:<br />
+      <input type="text" name="redirect_uri" required /> </label
+    ><br /><br />
+
+    <button type="submit">Save Credentials</button>
+  </form>
+</div>
+<br />
+
+{% endblock %}

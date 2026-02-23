@@ -10,7 +10,7 @@ import os, uuid
 from digforfire.recommender.recommend import Recommender
 from digforfire.utils.paths import output_path, resource_path
 from digforfire.utils.loading import ProgressTracker
-from digforfire.libraries.libraries import MusicBrainz
+from digforfire.libraries.libraries import MusicBrainz, Spotify
 from digforfire import config
 from digforfire.recommender.history import HistoryManager
 
@@ -101,7 +101,7 @@ async def enrich_library(file: UploadFile = File(...), background_tasks: Backgro
     tracker = ProgressTracker(total=len(mb.local_library))
     tasks[task_id] = tracker
 
-    background_tasks.add_task(mb.fetch_library, library_path, mb_library_progress=tracker)
+    background_tasks.add_task(mb.fetch_library, library_path, progress=tracker)
 
     return {"status": "started", "task_id": task_id}
 
@@ -118,6 +118,30 @@ def get_progress(task_id: str):
         "eta": tracker.eta
     }
 
+@app.post("/user/spotify/save-credentials")
+async def save_spotify_credentials(request: Request):
+    data = await request.json()
+    client_id, client_secret, redirect_uri = data.get("client_id"), data.get("client_secret"), data.get("redirect_uri")
+
+    if not os.path.exists(config.ENV_PATH):
+        with open(config.ENV_PATH, "w") as f: f.write("")
+    
+    if client_id and client_secret and redirect_uri:
+        config.save_env("SPOTIFY_CLIENT_ID", client_id)
+        config.save_env("SPOTIFY_CLIENT_SECRET", client_secret)
+        config.save_env("SPOTIFY_REDIRECT_URI", redirect_uri)
+
+@app.get("/user/spotify/credentials-check")
+def spotify_credentials_check():
+    ok = bool(config.SPOTIFY_CLIENT_ID and config.SPOTIFY_CLIENT_SECRET and config.SPOTIFY_REDIRECT_URI)
+    return {"ok": ok}
+    
+@app.get("/user/spotify/import-library")
+def import_spotify_library():
+    spotify = Spotify(config.SPOTIFY_CLIENT_ID, config.SPOTIFY_CLIENT_SECRET, config.SPOTIFY_REDIRECT_URI)
+    spotify.fetch_library()
+
+
 
 templates = Jinja2Templates(directory=resource_path("digforfire", "templates"))
 app.mount("/static", StaticFiles(directory=resource_path("digforfire", "static"), follow_symlink=True), name="static")
@@ -132,3 +156,7 @@ def homepage(request: Request):
 @app.get("/user", response_class=HTMLResponse)
 def userpage(request: Request):
     return templates.TemplateResponse("user.html", {"request": request, "contact": config.contact})
+
+@app.get("/user/spotify/setup", response_class=HTMLResponse)
+def userpage(request: Request):
+    return templates.TemplateResponse("spotify_setup.html", {"request": request, "contact": config.contact})

@@ -17,7 +17,7 @@ export async function getHistory(containerId) {
   }
 }
 
-export async function enrichLibrary(file) {
+export async function enrichLibrary(file, progressBar, importStatus) {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -30,7 +30,7 @@ export async function enrichLibrary(file) {
     const data = await response.json();
 
     if (data.task_id) {
-      pollProgress(data.task_id);
+      pollProgress(data.task_id, progressBar, importStatus);
     }
 
     if (!response.ok) {
@@ -45,7 +45,7 @@ export async function enrichLibrary(file) {
   }
 }
 
-export async function importLibrary() {
+export async function importLibrary(progressBar, importStatus) {
   var fileInput = document.getElementById("library-file");
   if (!fileInput.files.length) {
     alert("Select a file first!");
@@ -55,25 +55,25 @@ export async function importLibrary() {
   var file = fileInput.files[0];
 
   try {
-    var statusText = await enrichLibrary(file);
-    document.getElementById("import-status").innerText = statusText;
+    var statusText = await enrichLibrary(file, progressBar, importStatus);
+    document.getElementById(importStatus).innerText = statusText;
   } catch (err) {
     console.error(err);
-    document.getElementById("import-status").innerText =
+    document.getElementById(importStatus).innerText =
       "Error uploading library.";
   }
 }
 
-export async function pollProgress(taskId) {
-  const progressBar = document.getElementById("progress-bar");
-  const statusText = document.getElementById("import-status");
+export async function pollProgress(taskId, progressBar, importStatus) {
+  const pb = document.getElementById(progressBar);
+  const statusText = document.getElementById(importStatus);
 
   const interval = setInterval(async () => {
     const res = await fetch(`/progress/${taskId}`);
     if (!res.ok) return;
 
     const data = await res.json();
-    progressBar.value = data.ratio * 100;
+    pb.value = data.ratio * 100;
 
     let etaText = "";
     if (data.eta >= 0) {
@@ -82,7 +82,7 @@ export async function pollProgress(taskId) {
       etaText = ` – ETA: ${minutes}m ${seconds}s`;
     }
 
-    statusText.innerText = `Progress: ${progressBar.value.toFixed(1)}%${etaText}`;
+    statusText.innerText = `Progress: ${pb.value.toFixed(1)}%${etaText}`;
 
     if (data.ratio >= 1) clearInterval(interval);
   }, 1000);
