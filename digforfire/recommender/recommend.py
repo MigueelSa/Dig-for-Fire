@@ -30,7 +30,7 @@ class Recommender:
     
     def _save_recommendations(self, recommendations: LibraryData, output_path = output_path("data")) -> None:
         recommendation_history_path = os.path.abspath(os.path.join(output_path, "recommendation-history-Dig-for-Fire.json"))
-        history = self._load_recommendations()
+        history = self.recommendation_history
         history.extend(recommendations)
         with open(recommendation_history_path, "w", encoding='utf-8') as file:
             json.dump(history, file, ensure_ascii=False, indent=4)
