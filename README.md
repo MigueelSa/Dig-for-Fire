@@ -5,7 +5,7 @@
     </td>
     <td width="70%">
       <p>
-        <strong>Dig-for-Fire</strong> is a content-based music recommendation engine built on top of **MusicBrainz metadata**.
+        <strong>Dig-for-Fire</strong> is a content-based music recommendation engine built on top of <strong>MusicBrainz metadata</strong>.
       It enriches a local album library with structured genre and tag information, builds multiple embedding spaces, and explores adjacent musical regions to generate recommendations.
       </p>
     </td>
