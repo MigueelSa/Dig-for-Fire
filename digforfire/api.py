@@ -12,7 +12,7 @@ from digforfire.recommender.recommend import Recommender
 from digforfire.utils.paths import output_path, resource_path
 from digforfire.utils.loading import ProgressTracker
 from digforfire.libraries.libraries import MusicBrainz, Spotify
-from digforfire.config import config_api, config_base
+from digforfire.config import config_api, config_base   
 from digforfire.recommender.history import HistoryManager
 
 class AlbumResponse(BaseModel):
