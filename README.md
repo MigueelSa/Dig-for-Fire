@@ -1,7 +1,16 @@
-# Dig-for-Fire
-
-**Dig-for-Fire** is a content-based music recommendation engine built on top of **MusicBrainz metadata**.
-It enriches a local album library with structured genre and tag information, builds multiple embedding spaces, and explores adjacent musical regions to generate recommendations.
+<table width="100%">
+  <tr>
+    <td width="30%">
+      <img src="digforfire/images/logo.png" alt="logo" width="200">
+    </td>
+    <td width="70%">
+      <p>
+        <strong>Dig-for-Fire</strong> is a content-based music recommendation engine built on top of **MusicBrainz metadata**.
+      It enriches a local album library with structured genre and tag information, builds multiple embedding spaces, and explores adjacent musical regions to generate recommendations.
+      </p>
+    </td>
+  </tr>
+</table>
 
 ---
 
