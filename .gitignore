@@ -220,7 +220,3 @@ dist/data
 dist/
 build/
 *.log
-
-
-
-.aider*
