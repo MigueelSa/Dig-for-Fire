@@ -5,6 +5,7 @@ from digforfire.recommender.recommend import Recommender
 from digforfire.utils.paths import output_path
 from digforfire.scripts.add_album import add_album
 from digforfire.config import config
+from digforfire.libraries import SpotifyJSONConverter
 
 def main():
     parser = argparse.ArgumentParser(description="Dig-for-Fire: music recommendation engine")
@@ -33,7 +34,11 @@ def main():
     if args.library_path or args.add_album or args.recommend:
         if not os.path.exists(json_path):
             if args.library_path:
-                MusicBrainz(app_name, app_version, email).fetch_library(os.path.abspath(args.library_path))
+                library_path = args.library_path
+                # convert the library if it's a Spotify JSON file
+                if SpotifyJSONConverter.can_handle(library_path):
+                    library_path = SpotifyJSONConverter.convert_and_save(library_path)
+                MusicBrainz(app_name, app_version, email).fetch_library(os.path.abspath(library_path))
                 
             else:
                 logging.error("No library found. Please provide --library_path")

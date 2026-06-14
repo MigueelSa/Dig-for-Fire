@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 import os, json, spotipy, math, logging, pickle, re, unicodedata, time
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
@@ -202,8 +202,11 @@ class MusicBrainz(Library):
     def _fetch_library(
         self, progress: ProgressTracker | None = None, batch_size: int = 50
     ) -> None:
+        # local json file
         assert self.local_library is not None
+        # library in the running instance
         library = self.library
+        # thought for a library that has already been processed, to avoid doing the same work again
         existing_albums = {
             album.get("local_id") for album in library if album.get("local_id")
         }
