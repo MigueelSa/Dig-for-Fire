@@ -2,7 +2,8 @@ import json
 
 from digforfire.models.models import LibraryData
 
-class SpotifyJSONConverter():
+
+class SpotifyJSONConverter:
     @staticmethod
     def _convert(file: str) -> LibraryData:
         """Convert Spotify JSON data to a standard format."""
@@ -14,11 +15,11 @@ class SpotifyJSONConverter():
             converted_album = {
                 "id": album.get("uri"),
                 "title": album.get("album"),
-                "artist": [album.get("artist")]
+                "artist": [album.get("artist")],
             }
             converted_library.append(converted_album)
         return converted_library
-    
+
     @staticmethod
     def can_handle(file: str) -> bool:
         """Check if the file is a Spotify JSON file."""
@@ -28,13 +29,14 @@ class SpotifyJSONConverter():
             return "albums" in data
         except Exception:
             return False
-    
+
     @staticmethod
-    def save_converted_library(converted_library: LibraryData, output_file: str) -> None:
+    def save_converted_library(
+        converted_library: LibraryData, output_file: str
+    ) -> None:
         """Save the converted library to a JSON file."""
         with open(output_file, "w") as f:
             json.dump(converted_library, f, indent=4)
-        
 
     @staticmethod
     def convert_and_save(file: str) -> str:
