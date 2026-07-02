@@ -31,6 +31,9 @@ dependencies = [
     "python-multipart>=0.0.7"
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
 [project.scripts]
 digforfire = "digforfire.main:main"
 digforfire-api = "digforfire.scripts.run_api:main"
@@ -39,6 +42,9 @@ digforfire-api = "digforfire.scripts.run_api:main"
 where = ["."]
 include = ["digforfire*"]
 exclude = ["data*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.digforfire.contact]
 email="miguel.bcmsa@proton.me"
