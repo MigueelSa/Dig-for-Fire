@@ -1,55 +1,73 @@
 import logging, time
-import os, json
+import os
 
 from digforfire.libraries.libraries import MusicBrainz
 from digforfire.models.models import LibraryData, MethodType
 from digforfire.recommender.fetcher import Fetcher
-from digforfire.utils.paths import output_path
 from digforfire.embeddings.genre_space import GenreSpace
 from digforfire.embeddings.tag_space import TagSpace
-from digforfire.recommender.history import HistoryManager
+from digforfire.recommender.history import JsonHistoryRepository
+
 
 class Recommender:
 
-    def __init__(self, library_path: str, email: str, lastfm_api_key: str, app_name: str = "Dig-for-Fire", app_version: str = "0.1", k: int = 2, limit: int = 10, threshold: float = 0.6, 
-                 method: MethodType = "pmi", n_clusters: int = 50):
-        self.mb_library: MusicBrainz                                                            =   MusicBrainz(app_name, app_version, email)
-        self.library: LibraryData                                                               =   self.mb_library._load_library(library_path)
-        self.roots: set[str]                                                                    =   self.mb_library.tags.roots
-        self.genre_embeddings: GenreSpace                                                       =   GenreSpace(self.library, method=method)
-        self.tag_embeddings: TagSpace                                                           =   TagSpace(self.library, n_clusters=n_clusters)
-        self.recommendation_history: LibraryData                                                =   HistoryManager.load_recommendations()
-        self.fetcher: Fetcher                                                                   =   Fetcher(self.library, self.mb_library, self.genre_embeddings, self.tag_embeddings, 
-                                                                                                            self.recommendation_history, k, limit, threshold)
-        self.lastfm_api_key                                                                     =   lastfm_api_key
-    
+    def __init__(
+        self,
+        library_path: str,
+        email: str,
+        lastfm_api_key: str,
+        app_name: str = "Dig-for-Fire",
+        app_version: str = "0.1",
+        k: int = 2,
+        limit: int = 10,
+        threshold: float = 0.6,
+        method: MethodType = "pmi",
+        n_clusters: int = 50,
+    ):
+        self.mb_library: MusicBrainz = MusicBrainz(app_name, app_version, email)
+        self.library: LibraryData = self.mb_library._load_library(library_path)
+        self.roots: set[str] = self.mb_library.tags.roots
+        self.genre_embeddings: GenreSpace = GenreSpace(self.library, method=method)
+        self.tag_embeddings: TagSpace = TagSpace(self.library, n_clusters=n_clusters)
+        self.history_repository: JsonHistoryRepository = JsonHistoryRepository()
+        self.recommendation_history: LibraryData = (
+            self.history_repository.load_recommendations()
+        )
+        self.fetcher: Fetcher = Fetcher(
+            self.library,
+            self.mb_library,
+            self.genre_embeddings,
+            self.tag_embeddings,
+            self.recommendation_history,
+            k,
+            limit,
+            threshold,
+        )
+        self.lastfm_api_key = lastfm_api_key
+
     def recommend(self) -> str:
         top_albums = self.fetcher._fetch_recommendations(self.lastfm_api_key)
-        self._save_recommendations(top_albums)
+        self.history_repository.save_recommendations(top_albums)
         return top_albums
-    
-    def _save_recommendations(self, recommendations: LibraryData, output_path = output_path("data")) -> None:
-        recommendation_history_path = os.path.abspath(os.path.join(output_path, "recommendation-history-Dig-for-Fire.json"))
-        history = self.recommendation_history
-        history.extend(recommendations)
-        with open(recommendation_history_path, "w", encoding='utf-8') as file:
-            json.dump(history, file, ensure_ascii=False, indent=4)
 
 
-    
 if __name__ == "__main__":
     import argparse, time
     from digforfire.config import config
 
-    logging.basicConfig(filename='errors.log',
-                        filemode='a',
-                        format='%(asctime)s - %(levelname)s - %(message)s',
-                        level=logging.ERROR)
-    
+    logging.basicConfig(
+        filename="errors.log",
+        filemode="a",
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        level=logging.ERROR,
+    )
+
     start_time = time.time()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--library_path', type=str, required=True, help="Path of the local library.")
-    parser.add_argument('--email', type=str, required=True, help="User email address.")
+    parser.add_argument(
+        "--library_path", type=str, required=True, help="Path of the local library."
+    )
+    parser.add_argument("--email", type=str, required=True, help="User email address.")
     args = parser.parse_args()
 
     library, email = os.path.abspath(args.library_path), args.email

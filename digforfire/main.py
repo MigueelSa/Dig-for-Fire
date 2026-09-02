@@ -34,6 +34,7 @@ def main():
         format="%(asctime)s - %(levelname)s - %(message)s",
         level=logging.ERROR,
     )
+    logging.captureWarnings(True)
 
     app_name, app_version, email = config.APP_NAME, config.APP_VERSION, config.APP_EMAIL
     json_path = output_path("data", "MusicBrainz-Dig-for-Fire.json")
@@ -73,7 +74,8 @@ def main():
                 output = ""
                 for ialbum, album in enumerate(recommendations):
                     output += f"{ialbum+1}. {album['title']} by {', '.join(album['artist'])}. Genres: {', '.join(album['genres'])}. Tags: {', '.join(album['tags'])}. Similarity score: {album['score']}.\n"
-                return output
+                print(output)
+                return 0
 
 
 if __name__ == "__main__":
