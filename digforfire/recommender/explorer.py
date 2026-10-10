@@ -1,8 +1,9 @@
 import random
 from collections import Counter
 
-from digforfire.utils.albums import get_album_genres, get_album_tags
 from digforfire.models.models import LibraryData
+from digforfire.utils.albums import get_album_genres, get_album_tags
+
 
 class Explorer:
     def __init__(self, library: LibraryData, roots: set[str], ancestors_children: dict[str, list[str]]):

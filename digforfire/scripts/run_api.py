@@ -1,7 +1,11 @@
-import uvicorn, os, shutil
+import os
+import shutil
 
-from digforfire.utils.paths import output_path, resource_path
+import uvicorn
+
 from digforfire.config import config_base
+from digforfire.utils.paths import output_path, resource_path
+
 
 def ensure_env():
     env_example_path = resource_path(".env.example")

@@ -1,7 +1,10 @@
-import json, os
-import pandas as pd
-import matplotlib.pyplot as plt
+import json
+import os
 from collections import Counter
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
 
 def load_library_as_df(library_path: str) -> pd.DataFrame:
     with open(library_path) as file:
@@ -49,12 +52,14 @@ def plot_hbar(library_df: pd.DataFrame, top_n=50) -> None:
 
 
 if __name__ == "__main__":
-    import argparse, time, os
+    import argparse
+    import os
+    import time
     start_time = time.time()
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--library_path', type=str, required=True, help="Path of the Music Brainz library.")
-    args = parser.parse_args() 
+    args = parser.parse_args()
 
     library_path = os.path.abspath(args.library_path)
 

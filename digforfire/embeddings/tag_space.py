@@ -1,19 +1,20 @@
-from digforfire.models.models import AlbumData, LibraryData, EmbeddingData
-from digforfire.embeddings.embeddings import Embeddings
-from digforfire.utils.albums import get_album_tags
-from digforfire.utils.loading import loading_animation
-
-from sentence_transformers import SentenceTransformer
-import numpy as np
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import normalize
 import logging
 
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import normalize
+
+from digforfire.embeddings.embeddings import Embeddings
+from digforfire.models.models import AlbumData, EmbeddingData, LibraryData
+from digforfire.utils.albums import get_album_tags
+from digforfire.utils.loading import loading_animation
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 from transformers.utils.logging import disable_progress_bar
+
 disable_progress_bar()
 
 

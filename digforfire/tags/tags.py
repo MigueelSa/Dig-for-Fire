@@ -1,8 +1,11 @@
-import json, os, re
+import json
+import os
+import re
 from functools import lru_cache
 from typing import Any
 
 from digforfire.utils.paths import resource_path
+
 
 class Tags:
 
@@ -98,7 +101,7 @@ class Tags:
         if year is not None:
             return str(year//10) + "0s"
         else:
-            return None 
+            return None
 
     def genres_tags(self, tag_names: list[Any]) -> tuple[list[str], list[str]]:
         """
@@ -183,7 +186,7 @@ class Tags:
         return roots
     
     def get_library_artists(self, library: list[dict]) -> dict[str, str]:
-        artists = {} 
+        artists = {}
         for album in library:
             for id, artist in enumerate(album.get("artist", [])):
                 artists[artist] = album.get("artist_id", [None])[id]

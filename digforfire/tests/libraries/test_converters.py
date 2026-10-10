@@ -1,4 +1,6 @@
-import json, pytest
+import json
+
+import pytest
 
 from digforfire.libraries.converters import SpotifyJSONConverter
 

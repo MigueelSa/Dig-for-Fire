@@ -1,5 +1,8 @@
-import os, tomli
+import os
+
+import tomli
 from dotenv import load_dotenv, set_key
+
 from digforfire.utils.paths import resource_path
 
 pyproject_path = resource_path("pyproject.toml")

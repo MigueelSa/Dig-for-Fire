@@ -1,14 +1,23 @@
+import json
+import logging
+import math
+import os
+import pickle
+import re
+import time
+import unicodedata
 from abc import ABC
-import os, json, spotipy, math, logging, pickle, re, unicodedata, time
+
+import musicbrainzngs as mb
+import spotipy
+from musicbrainzngs import WebServiceError
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
-import musicbrainzngs as mb
-from musicbrainzngs import WebServiceError
 
-from digforfire.tags.tags import Tags
 from digforfire.models.models import AlbumData, LibraryData, LibraryType
-from digforfire.utils.paths import output_path
+from digforfire.tags.tags import Tags
 from digforfire.utils.loading import ProgressTracker
+from digforfire.utils.paths import output_path
 
 
 class Library(ABC):

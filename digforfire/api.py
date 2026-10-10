@@ -1,19 +1,22 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
-from pydantic import BaseModel
+import os
+import uuid
 from typing import List, Optional
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.requests import Request
-from fastapi.templating import Jinja2Templates
-import os, uuid
-from dotenv import load_dotenv
 
-from digforfire.recommender.recommend import Recommender
-from digforfire.utils.paths import output_path, resource_path
-from digforfire.utils.loading import ProgressTracker
+from dotenv import load_dotenv
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi.requests import Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+from digforfire.config import config_api, config_base
 from digforfire.libraries.libraries import MusicBrainz, Spotify
-from digforfire.config import config_api, config_base   
 from digforfire.recommender.history import HistoryManager
+from digforfire.recommender.recommend import Recommender
+from digforfire.utils.loading import ProgressTracker
+from digforfire.utils.paths import output_path, resource_path
+
 
 class AlbumResponse(BaseModel):
     id: str
@@ -46,7 +49,7 @@ def get_recommendations():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     clean = [
-        AlbumResponse(id=album["id"], title=album["title"], artist=album["artist"], 
+        AlbumResponse(id=album["id"], title=album["title"], artist=album["artist"],
                     genres=list(album["genres"].keys()), tags=album["tags"], score=album["score"],
                     cover_url = f"https://coverartarchive.org/release-group/{album['id']}/front-250")
 
@@ -64,7 +67,7 @@ def get_library():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     clean = [
-        AlbumResponse(id=album["id"], title=album["title"], artist=album["artist"], 
+        AlbumResponse(id=album["id"], title=album["title"], artist=album["artist"],
                     genres=list(album["genres"].keys()), tags=album["tags"],
                     cover_url = f"https://coverartarchive.org/release-group/{album['id']}/front-250")
 
@@ -77,7 +80,7 @@ def get_library():
 def get_history():
     results = HistoryManager.load_recommendations()
     clean = [
-        AlbumResponse(id=album["id"], title=album["title"], artist=album["artist"], 
+        AlbumResponse(id=album["id"], title=album["title"], artist=album["artist"],
                     genres=list(album["genres"].keys()), tags=album["tags"], score=album["score"],
                     cover_url = f"https://coverartarchive.org/release-group/{album['id']}/front-250")
 

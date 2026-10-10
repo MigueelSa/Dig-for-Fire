@@ -1,5 +1,7 @@
-import os, sys
+import os
+import sys
 from typing import Any
+
 
 def resource_path(*parts: Any) -> str:
     if getattr(sys, "frozen", False):

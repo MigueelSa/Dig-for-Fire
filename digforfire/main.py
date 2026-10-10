@@ -1,11 +1,14 @@
-import argparse, logging, os, sys
+import argparse
+import logging
+import os
+import sys
 
-from digforfire.libraries.libraries import MusicBrainz
-from digforfire.recommender.recommend import Recommender
-from digforfire.utils.paths import output_path
-from digforfire.scripts.add_album import add_album
 from digforfire.config import config
 from digforfire.libraries import SpotifyJSONConverter
+from digforfire.libraries.libraries import MusicBrainz
+from digforfire.recommender.recommend import Recommender
+from digforfire.scripts.add_album import add_album
+from digforfire.utils.paths import output_path
 
 
 def main():

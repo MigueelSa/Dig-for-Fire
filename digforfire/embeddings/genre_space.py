@@ -1,18 +1,23 @@
-from digforfire.embeddings.embeddings import Embeddings
-from digforfire.models.models import AlbumData, LibraryData, EmbeddingData, MethodType
-from digforfire.utils.albums import get_album_genres
-from digforfire.utils.paths import output_path
-from digforfire.utils.loading import loading_animation
-
-import multiprocessing, hashlib, pickle, os
-import networkx as nx
-from node2vec import Node2Vec
-from gensim.models import KeyedVectors
+import hashlib
+import multiprocessing
+import os
+import pickle
 from typing import Literal
+
+import networkx as nx
 import numpy as np
+from gensim.models import KeyedVectors
+from node2vec import Node2Vec
+from scipy.sparse import coo_matrix
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import normalize
-from scipy.sparse import coo_matrix
+
+from digforfire.embeddings.embeddings import Embeddings
+from digforfire.models.models import AlbumData, EmbeddingData, LibraryData, MethodType
+from digforfire.utils.albums import get_album_genres
+from digforfire.utils.loading import loading_animation
+from digforfire.utils.paths import output_path
+
 
 class GenreSpace(Embeddings):
     def __init__(self, library: LibraryData, method: MethodType = "pmi"):
@@ -146,8 +151,8 @@ class GenreSpace(Embeddings):
 
         return smoothed_vectors
 
-    def _smooth_by_node2vec(self, embeddings: EmbeddingData, gamma: float = 0.2, 
-                            n2v_dim: int | None = None, n2v_walk_length: int = 30, n2v_num_walks: int = 100, 
+    def _smooth_by_node2vec(self, embeddings: EmbeddingData, gamma: float = 0.2,
+                            n2v_dim: int | None = None, n2v_walk_length: int = 30, n2v_num_walks: int = 100,
                             n2v_window: int = 10, n2v_p: float = 1, n2v_q: float = 1, n2v_weight: float = 0.5) -> EmbeddingData:
         
         G = nx.Graph()
@@ -188,7 +193,7 @@ class GenreSpace(Embeddings):
                 n2v_vec = n2v_model.wv[genre]
                 merged_vec = (1 - n2v_weight) * genre_vectors[genre] + n2v_weight * n2v_vec
             else:
-                merged_vec = genre_vectors[genre]        
+                merged_vec = genre_vectors[genre]
             genre_vectors[genre] = normalize(merged_vec.reshape(1,-1))[0]
 
         return genre_vectors

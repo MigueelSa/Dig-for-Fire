@@ -1,17 +1,24 @@
-import logging, time, re, requests, logging, json, os, pickle
+import json
+import logging
+import os
+import pickle
+import re
+import time
+
+import musicbrainzngs as mb
 import numpy as np
 import pandas as pd
+import requests
 from sklearn.metrics.pairwise import cosine_similarity
-import musicbrainzngs as mb
 from sklearn.preprocessing import normalize
 
 from digforfire.embeddings.genre_space import GenreSpace
 from digforfire.embeddings.tag_space import TagSpace
+from digforfire.libraries.libraries import MusicBrainz
 from digforfire.ml.predictor import Predictor
 from digforfire.models.models import AlbumData, LibraryData
-from digforfire.utils.loading import loading_animation
 from digforfire.recommender.explorer import Explorer
-from digforfire.libraries.libraries import MusicBrainz
+from digforfire.utils.loading import loading_animation
 from digforfire.utils.paths import output_path
 
 

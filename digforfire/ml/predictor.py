@@ -1,10 +1,9 @@
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
 
-
-from digforfire.models.models import AlbumData, LibraryData, EmbeddingData
+from digforfire.models.models import AlbumData, EmbeddingData, LibraryData
 from digforfire.utils.paths import output_path
 
 
@@ -124,11 +123,10 @@ class Predictor:
 
 
 if __name__ == "__main__":
-    from libraries.libraries import MusicBrainz
-    from sklearn.metrics import accuracy_score, roc_auc_score
-
     from embeddings.genre_space import GenreSpace
     from embeddings.tag_space import TagSpace
+    from libraries.libraries import MusicBrainz
+    from sklearn.metrics import accuracy_score, roc_auc_score
 
     history_path = output_path("data/recommendation-history-Dig-for-Fire.json")
     library_path = output_path("data/MusicBrainz-Dig-for-Fire.json")

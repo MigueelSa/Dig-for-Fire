@@ -1,4 +1,8 @@
-import sys, time, threading, itertools
+import itertools
+import sys
+import threading
+import time
+
 
 def loading_animation(message: str | list  = "Loading...", delay: float = 0.1):
     """
