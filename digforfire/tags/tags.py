@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from functools import lru_cache
+from functools import cache
 from typing import Any
 
 from digforfire.utils.paths import resource_path
@@ -62,7 +62,7 @@ class Tags:
 
         self._save_repo()
 
-    @lru_cache(maxsize=None)
+    @cache
     def _normalize_tag(self, tag_name: str) -> str | None:
         if tag_name is None:
             return

@@ -140,8 +140,9 @@ if __name__ == "__main__":
     else:
         print("Using imbalanced dataset.")
 
-    genre_embeddings, tag_embeddings = GenreSpace(library, method="pmi"), TagSpace(
-        library, n_clusters=50
+    genre_embeddings, tag_embeddings = (
+        GenreSpace(library, method="pmi"),
+        TagSpace(library, n_clusters=50),
     )
 
     predictor = Predictor(
@@ -163,7 +164,7 @@ if __name__ == "__main__":
     scores = predictor.model.predict_proba(X_test)[:, 1]
     ranking = np.argsort(scores)[::-1]
 
-    top10 = list(zip(ranking[:10], y_test[ranking][:10]))
+    top10 = list(zip(ranking[:10], y_test[ranking][:10], strict=True))
     print("Top 10 predictions (index, true label):", top10)
 
     report = classification_report(y_test, preds, digits=3, zero_division=0)
