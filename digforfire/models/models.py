@@ -1,4 +1,5 @@
 from typing import Any, Literal
+
 import numpy as np
 
 AlbumData = dict[str, Any]

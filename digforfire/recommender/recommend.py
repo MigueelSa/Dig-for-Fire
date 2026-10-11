@@ -1,16 +1,16 @@
-import logging, time
+import logging
 import os
+import time
 
+from digforfire.embeddings.genre_space import GenreSpace
+from digforfire.embeddings.tag_space import TagSpace
 from digforfire.libraries.libraries import MusicBrainz
 from digforfire.models.models import LibraryData, MethodType
 from digforfire.recommender.fetcher import Fetcher
-from digforfire.embeddings.genre_space import GenreSpace
-from digforfire.embeddings.tag_space import TagSpace
 from digforfire.recommender.history import JsonHistoryRepository
 
 
 class Recommender:
-
     def __init__(
         self,
         library_path: str,
@@ -52,7 +52,9 @@ class Recommender:
 
 
 if __name__ == "__main__":
-    import argparse, time
+    import argparse
+    import time
+
     from digforfire.config import config
 
     logging.basicConfig(

@@ -32,11 +32,24 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.16.8",
+    "pre-commit>=4.6.2"
+]
+
 
 [project.scripts]
 digforfire = "digforfire.main:main"
 digforfire-api = "digforfire.scripts.run_api:main"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "B", "I", "UP"]
+fixable = ["I001", "W291", "W292", "F401", "F541", "UP045", "UP006", "UP033", "UP035", "B905", "B007", "E402"]
+ignore = ["E501", "E401", "W293", "UP015"]
 
 [tool.setuptools.packages.find]
 where = ["."]

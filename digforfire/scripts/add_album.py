@@ -1,6 +1,7 @@
 from digforfire.libraries.libraries import MusicBrainz
 from digforfire.utils.paths import output_path
 
+
 def add_album(title: str, artist: str, app_name: str, app_version: str, email: str) -> None:
     mb = MusicBrainz(app_name, app_version, email)
     mb.load_library(output_path("data/MusicBrainz-Dig-for-Fire.json"))  # Ensure library is loaded before adding an album

@@ -1,5 +1,6 @@
 from digforfire.models.models import AlbumData
 
+
 def get_album_genres(album: AlbumData) -> dict[str, int]:
      return album.get("genres", {})
 

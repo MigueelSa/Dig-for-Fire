@@ -1,1 +1,1 @@
-from digforfire.libraries.converters import SpotifyJSONConverter
+from digforfire.libraries.converters import SpotifyJSONConverter as SpotifyJSONConverter

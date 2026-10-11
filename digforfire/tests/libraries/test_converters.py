@@ -1,4 +1,6 @@
-import json, pytest
+import json
+
+import pytest
 
 from digforfire.libraries.converters import SpotifyJSONConverter
 
@@ -24,12 +26,12 @@ def fake_files(tmp_path) -> tuple[str, str]:
                                 "albums": [
                                     {
                                         "artist": "Boogarins",
-                                        "album": "Lá Vem a Morte", 
+                                        "album": "Lá Vem a Morte",
                                         "uri": "spotify:album:1a2b3c4d5e6f7g8h9i0j"
                                     },
                                     {
                                         "artist": "Fausto",
-                                        "album": "O despertar dos alquimistas",        
+                                        "album": "O despertar dos alquimistas",
                                         "uri": "spotify:album:1a2b3c4d5e6f7g8h9i0j"
                                     },
                                     {
@@ -40,10 +42,10 @@ def fake_files(tmp_path) -> tuple[str, str]:
                         
                                 ],
                                 "shows": [
-                                    { 
-                                        "name": "Democracy Now! Audio", 
-                                        "publisher": "Democracy Now!", 
-                                        "uri": "spotify:show:3cNrL5nALTDuWbRfabHeOG" 
+                                    {
+                                        "name": "Democracy Now! Audio",
+                                        "publisher": "Democracy Now!",
+                                        "uri": "spotify:show:3cNrL5nALTDuWbRfabHeOG"
                                     },
                                     {
                                         "name": "The Album Years",

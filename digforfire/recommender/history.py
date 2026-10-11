@@ -1,5 +1,7 @@
+import json
+import os
 from abc import ABC, abstractmethod
-import json, os
+
 from digforfire.models.models import LibraryData
 from digforfire.utils.paths import output_path
 

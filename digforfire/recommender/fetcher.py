@@ -1,17 +1,24 @@
-import logging, time, re, requests, logging, json, os, pickle
+import json
+import logging
+import os
+import pickle
+import re
+import time
+
+import musicbrainzngs as mb
 import numpy as np
 import pandas as pd
+import requests
 from sklearn.metrics.pairwise import cosine_similarity
-import musicbrainzngs as mb
 from sklearn.preprocessing import normalize
 
 from digforfire.embeddings.genre_space import GenreSpace
 from digforfire.embeddings.tag_space import TagSpace
+from digforfire.libraries.libraries import MusicBrainz
 from digforfire.ml.predictor import Predictor
 from digforfire.models.models import AlbumData, LibraryData
-from digforfire.utils.loading import loading_animation
 from digforfire.recommender.explorer import Explorer
-from digforfire.libraries.libraries import MusicBrainz
+from digforfire.utils.loading import loading_animation
 from digforfire.utils.paths import output_path
 
 
@@ -144,7 +151,7 @@ class Fetcher:
                 ) * similarity_scores + self.predictor.alpha * album_scores
 
             for album, similarity_score in zip(
-                fetched_albums, similarity_scores.flatten()
+                fetched_albums, similarity_scores.flatten(), strict=True
             ):
                 album_id = self._canonical_album(album)
                 if (
@@ -188,9 +195,10 @@ class Fetcher:
     def _space_matrix(self, library: LibraryData) -> tuple[np.ndarray, np.ndarray]:
         g_list, t_list = [], []
         for album in library:
-            genre, tag = self.genre_embeddings.get_album_embeddings(
-                album
-            ), self.tag_embeddings.get_album_embeddings(album)
+            genre, tag = (
+                self.genre_embeddings.get_album_embeddings(album),
+                self.tag_embeddings.get_album_embeddings(album),
+            )
             g_list.append(genre)
             t_list.append(tag)
         g_array, t_array = np.vstack(g_list), np.vstack(t_list)
@@ -214,9 +222,10 @@ class Fetcher:
         gv, tv = None, None
 
         for album in self.library:
-            album_genres, album_tags = self.genre_embeddings.get_album_embeddings(
-                album
-            ), self.tag_embeddings.get_album_embeddings(album)
+            album_genres, album_tags = (
+                self.genre_embeddings.get_album_embeddings(album),
+                self.tag_embeddings.get_album_embeddings(album),
+            )
 
             gv_vec = album_genres
             gv = gv_vec if gv is None else gv + gv_vec
@@ -277,14 +286,11 @@ class Fetcher:
         self, artist: list[str], api_key: str, limit: int = 100, sleep_time: float = 1.0
     ) -> str | None:
         if not api_key:
-            logging.warning(
-                f"No Last.fm API key set. Skipping similar artist fetching."
-            )
+            logging.warning("No Last.fm API key set. Skipping similar artist fetching.")
             return {}
 
         results = []
         for artist_name in artist:
-
             mbid = [
                 a.get("artist_id")
                 for a in self.library
@@ -304,12 +310,12 @@ class Fetcher:
         os.makedirs(save_dir, exist_ok=True)
 
         if write_json:
-            file_name = f"Last.fm-similar_artists-Dig-for-Fire.json"
+            file_name = "Last.fm-similar_artists-Dig-for-Fire.json"
             output_file = os.path.join(save_dir, file_name)
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(dictionary, f, indent=4, ensure_ascii=False)
 
-        file_name = f"Last.fm-similar_artists-Dig-for-Fire.pkl"
+        file_name = "Last.fm-similar_artists-Dig-for-Fire.pkl"
         output_file = os.path.join(save_dir, file_name)
         tmp_file = output_file + ".tmp"
 

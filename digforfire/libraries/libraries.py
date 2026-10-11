@@ -1,14 +1,23 @@
-from abc import ABC
-import os, json, spotipy, math, logging, pickle, re, unicodedata, time
+import json
+import logging
+import math
+import os
+import pickle
+import re
+import time
+import unicodedata
+from abc import ABC, abstractmethod
+
+import musicbrainzngs as mb
+import spotipy
+from musicbrainzngs import WebServiceError
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
-import musicbrainzngs as mb
-from musicbrainzngs import WebServiceError
 
-from digforfire.tags.tags import Tags
 from digforfire.models.models import AlbumData, LibraryData, LibraryType
-from digforfire.utils.paths import output_path
+from digforfire.tags.tags import Tags
 from digforfire.utils.loading import ProgressTracker
+from digforfire.utils.paths import output_path
 
 
 class Library(ABC):
@@ -20,6 +29,12 @@ class Library(ABC):
         self.local_library: LibraryData | None = None
 
         self.save_dir = output_path("data")
+
+    def load_library(self, library_path: str) -> None:
+        self.library = self._load_library(library_path)
+
+    def load_local_library(self, local_library_path: str) -> None:
+        self.local_library: LibraryData = self._load_library(local_library_path)
 
     def _save_library(self, write_json=True) -> None:
         save_dir = self.save_dir
@@ -50,15 +65,16 @@ class Library(ABC):
         title = title.lower().replace("&", "and").strip()
         return title
 
-    def load_library(self, library_path: str) -> None:
-        self.library = self._load_library(library_path)
+    @abstractmethod
+    def _fetch_library(self) -> None:
+        pass
 
-    def load_local_library(self, local_library_path: str) -> None:
-        self.local_library: LibraryData = self._load_library(local_library_path)
+    @abstractmethod
+    def _feed_release(self, data: AlbumData) -> AlbumData:
+        pass
 
 
 class Spotify(Library):
-
     def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
         super().__init__()
         self.sp = spotipy.Spotify(
@@ -104,7 +120,7 @@ class Spotify(Library):
         results = self.sp.current_user_saved_albums(limit=self.limit)
         num_albums = results["total"]
         num_pages = math.ceil(num_albums / self.limit)
-        for i in tqdm(range(num_pages), desc="Going through albums...", leave=False):
+        for _ in tqdm(range(num_pages), desc="Going through albums...", leave=False):
             for item in results["items"]:
                 album = self._feed_release(item["album"])
                 albums.append(album)
@@ -122,7 +138,6 @@ class Spotify(Library):
 
 
 class MusicBrainz(Library):
-
     def __init__(self, app_name: str, app_version: str, email: str):
         super().__init__()
         mb.set_useragent(app_name, app_version, email)
@@ -222,8 +237,9 @@ class MusicBrainz(Library):
             local_id = album.get("id")
             if local_id in existing_albums:
                 continue
-            artist, name = album.get("artist", []), self._normalize_title(
-                album.get("title", "")
+            artist, name = (
+                album.get("artist", []),
+                self._normalize_title(album.get("title", "")),
             )
             artist = " AND ".join(artist) if isinstance(artist, list) else artist
 

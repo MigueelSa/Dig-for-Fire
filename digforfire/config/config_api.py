@@ -1,8 +1,8 @@
 import os
+
 from dotenv import load_dotenv
 
-from digforfire.config.config_base import get_env
-from digforfire.config.config_base import ENV_PATH, project
+from digforfire.config.config_base import ENV_PATH, get_env, project
 
 load_dotenv(ENV_PATH)
 

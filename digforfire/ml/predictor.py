@@ -1,10 +1,9 @@
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
 
-
-from digforfire.models.models import AlbumData, LibraryData, EmbeddingData
+from digforfire.models.models import AlbumData, EmbeddingData, LibraryData
 from digforfire.utils.paths import output_path
 
 
@@ -124,11 +123,10 @@ class Predictor:
 
 
 if __name__ == "__main__":
-    from libraries.libraries import MusicBrainz
-    from sklearn.metrics import accuracy_score, roc_auc_score
-
     from embeddings.genre_space import GenreSpace
     from embeddings.tag_space import TagSpace
+    from libraries.libraries import MusicBrainz
+    from sklearn.metrics import accuracy_score, roc_auc_score
 
     history_path = output_path("data/recommendation-history-Dig-for-Fire.json")
     library_path = output_path("data/MusicBrainz-Dig-for-Fire.json")
@@ -142,8 +140,9 @@ if __name__ == "__main__":
     else:
         print("Using imbalanced dataset.")
 
-    genre_embeddings, tag_embeddings = GenreSpace(library, method="pmi"), TagSpace(
-        library, n_clusters=50
+    genre_embeddings, tag_embeddings = (
+        GenreSpace(library, method="pmi"),
+        TagSpace(library, n_clusters=50),
     )
 
     predictor = Predictor(
@@ -165,7 +164,7 @@ if __name__ == "__main__":
     scores = predictor.model.predict_proba(X_test)[:, 1]
     ranking = np.argsort(scores)[::-1]
 
-    top10 = list(zip(ranking[:10], y_test[ranking][:10]))
+    top10 = list(zip(ranking[:10], y_test[ranking][:10], strict=True))
     print("Top 10 predictions (index, true label):", top10)
 
     report = classification_report(y_test, preds, digits=3, zero_division=0)

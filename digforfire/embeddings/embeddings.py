@@ -1,10 +1,20 @@
-import numpy as np
-import os, json, hashlib
+import hashlib
+import json
+import os
 from abc import ABC, abstractmethod
 
-from digforfire.models.models import AlbumData, LibraryData, EmbeddingData, MethodType, TokenType
-from digforfire.utils.paths import output_path
+import numpy as np
+
+from digforfire.models.models import (
+    AlbumData,
+    EmbeddingData,
+    LibraryData,
+    MethodType,
+    TokenType,
+)
 from digforfire.tags.tags import Tags
+from digforfire.utils.paths import output_path
+
 
 class Embeddings(ABC):
 
@@ -56,8 +66,8 @@ class Embeddings(ABC):
         payload = json.dumps({
             "vocabulary": self.vocabulary,
             "library_snapshot": library_snapshot,
-            "method": self.method, 
-            "token_type": self.token_type, 
+            "method": self.method,
+            "token_type": self.token_type,
             "embedding_dimension": embedding_dimension
             }, sort_keys=True)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
