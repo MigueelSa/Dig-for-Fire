@@ -97,7 +97,6 @@ cp .env.example .env
 | `APP_NAME`, `APP_EMAIL` | MusicBrainz identification | You set these; MusicBrainz asks clients to identify themselves |
 | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI` | Spotify import | [Spotify Developer Dashboard](https://developer.spotify.com/documentation/web-api) |
 | `LASTFM_API_KEY` | Recommendations (artist similarity) | [Last.fm API](https://www.last.fm/api) |
-| `API_HOST`, `API_PORT` | Web app | Defaults to `127.0.0.1:8000` |
 
 > **Note:** Spotify import and Last.fm-backed recommendations only need their credentials filled in when you actually use those features. Enriching a local JSON library works without any API keys beyond MusicBrainz identification.
 
