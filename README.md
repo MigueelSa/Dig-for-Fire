@@ -10,7 +10,7 @@
         information, builds multiple embedding spaces, and explores adjacent musical regions to recommend albums you don't own yet.
       </p>
       <p>
-        It ships with both a <strong>command-line interface</strong> and a <strong>FastAPI web app</strong>.
+        It currently ships as a <strong>command-line tool</strong>; a server-hosted API is planned.
       </p>
     </td>
   </tr>
@@ -25,7 +25,6 @@
 - [Configuration](#configuration)
 - [Usage](#usage)
   - [CLI](#cli)
-  - [Web app](#web-app)
   - [Example JSON library](#example-json-library)
 - [How it works](#how-it-works)
 - [Project structure](#project-structure)
@@ -41,7 +40,7 @@
 - **Two embedding spaces** — a graph-driven **GenreSpace** (co-occurrence / PMI / PPMI / SVD, with optional smoothing) and a language-driven **TagSpace** (sentence-transformer embeddings clustered with KMeans).
 - **Taste-vector recommendations** — candidates fetched live from MusicBrainz and Last.fm, ranked by cosine similarity against your library's taste vector.
 - **Optional ML layer** — a RandomForest classifier trained on your recommendation-feedback history to reweight the ranking.
-- **Two interfaces** — a CLI (`digforfire`) and a FastAPI web app (`digforfire-api`).
+- **CLI** — everything runs from the `digforfire` command. A server-hosted API is planned for later.
 - **Caching** — enriched libraries and embedding matrices are cached to disk so only the first run pays the MusicBrainz rate-limit cost.
 
 ---
@@ -71,12 +70,11 @@ venv\Scripts\activate       # Windows
 pip install -e .
 ```
 
-This exposes two console commands:
+This exposes the console command:
 
 | Command | Description |
 |---------|-------------|
-| `digforfire`     | CLI entry point |
-| `digforfire-api` | Launches the FastAPI web app with uvicorn |
+| `digforfire` | CLI entry point |
 
 For development tooling (tests), install the extra:
 
@@ -146,28 +144,6 @@ aren't suggested twice.
 digforfire --add_album "Lá Vem a Morte" "Boogarins"
 ```
 
-### Web app
-
-```bash
-digforfire-api
-```
-
-Then open `http://127.0.0.1:8000`. On first launch, `.env` is created from
-`.env.example` if it doesn't exist. The web app serves:
-
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/`                | GET  | Recommendations page (redirects to `/user` if no library exists) |
-| `/user`            | GET  | Onboarding / library-import page |
-| `/recommend`       | GET  | JSON recommendations |
-| `/library`         | GET  | JSON of the enriched library |
-| `/history`         | GET  | JSON of past recommendations |
-| `/enrich-library`  | POST | Upload a JSON library; enrichment runs as a background task |
-| `/progress/{id}`   | GET  | Poll enrichment progress (current / total / ETA) |
-| `/user/spotify/*`  | GET/POST | Save & check credentials, import Spotify library |
-
-Album covers are pulled from the [Cover Art Archive](https://coverartarchive.org/).
-
 ### Example JSON library
 
 A library is a JSON array of albums. Minimal required fields:
@@ -211,8 +187,8 @@ with a minimal ancestor distance, plus its raw tags.
 
 ```python
 {
-  "genres": { "psychedelic_rock": 0, "rock": 1 },   # value = depth in the ontology
-  "tags":   ["lofi", "experimental"]
+    "genres": {"psychedelic_rock": 0, "rock": 1},  # value = depth in the ontology
+    "tags": ["lofi", "experimental"],
 }
 ```
 
@@ -267,12 +243,10 @@ changes.
 Dig-for-Fire/
 ├── digforfire/
 │   ├── main.py               # CLI entry point
-│   ├── api.py                # FastAPI app
 │   ├── analysis/             # Library analysis helpers
 │   ├── config/               # Config from .env + pyproject.toml
 │   │   ├── config_base.py    # env/pyproject loading, contact info
-│   │   ├── config.py         # CLI config
-│   │   └── config_api.py     # web-app config
+│   │   └── config.py         # CLI config
 │   ├── libraries/            # Spotify + MusicBrainz fetching (Library ABC)
 │   │   ├── libraries.py
 │   │   └── converters.py     # Spotify JSON → standard format
@@ -288,8 +262,7 @@ Dig-for-Fire/
 │   ├── ml/predictor.py       # RandomForest classifier
 │   ├── tags/tags.py          # genre taxonomy, normalization, ancestor graph
 │   ├── models/models.py      # type aliases (AlbumData, LibraryData, …)
-│   ├── scripts/              # add_album, import_spotify_library, run_api
-│   ├── static/ · templates/  # web-app assets (JS/CSS + Jinja2)
+│   ├── scripts/              # add_album, import_spotify_library
 │   ├── utils/                # path helpers, loading animation, album helpers
 │   └── tests/                # pytest suite
 ├── data/                     # cached libraries, embeddings, history (gitignored)
