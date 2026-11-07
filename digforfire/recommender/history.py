@@ -24,15 +24,16 @@ class HistoryRepository(ABC):
         pass
 
     @abstractmethod
-    def save_recommendations(self) -> None:
+    def add_recommendations(self, recommendations: LibraryData) -> None:
         pass
 
 
 class JsonHistoryRepository(HistoryRepository):
-
     def __init__(
-        self, path=output_path("data", "recommendation-history-Dig-for-Fire.json")
+        self,
+        path: str = output_path("data", "recommendation-history-Dig-for-Fire.json"),
     ):
+
         self.path = path
         if not os.path.exists(self.path):
             with open(self.path, "w", encoding="utf-8") as file:
@@ -43,6 +44,12 @@ class JsonHistoryRepository(HistoryRepository):
             recommendations = json.load(file)
         return recommendations
 
-    def save_recommendations(self, recommendations: LibraryData) -> None:
+    def add_recommendations(self, recommendations: LibraryData) -> None:
+        recommendation_history = self.load_recommendations()
         with open(self.path, "w", encoding="utf-8") as file:
-            json.dump(recommendations, file, ensure_ascii=False, indent=4)
+            json.dump(
+                recommendation_history + recommendations,
+                file,
+                ensure_ascii=False,
+                indent=4,
+            )

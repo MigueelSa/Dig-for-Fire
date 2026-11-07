@@ -6,8 +6,7 @@ from digforfire.embeddings.genre_space import GenreSpace
 from digforfire.embeddings.tag_space import TagSpace
 from digforfire.libraries.libraries import MusicBrainz
 from digforfire.models.models import LibraryData, MethodType
-from digforfire.recommender.fetcher import Fetcher
-from digforfire.recommender.history import JsonHistoryRepository
+from digforfire.recommender import Fetcher, JsonHistoryRepository
 
 
 class Recommender:
@@ -23,31 +22,50 @@ class Recommender:
         threshold: float = 0.6,
         method: MethodType = "pmi",
         n_clusters: int = 50,
+        history_repository: JsonHistoryRepository = None,
+        fetcher: Fetcher = None,
     ):
-        self.mb_library: MusicBrainz = MusicBrainz(app_name, app_version, email)
-        self.library: LibraryData = self.mb_library._load_library(library_path)
-        self.roots: set[str] = self.mb_library.tags.roots
-        self.genre_embeddings: GenreSpace = GenreSpace(self.library, method=method)
-        self.tag_embeddings: TagSpace = TagSpace(self.library, n_clusters=n_clusters)
-        self.history_repository: JsonHistoryRepository = JsonHistoryRepository()
+
+        if (
+            history_repository is None
+        ):  # this is because we want to allow for dependency injection for testing purposes
+            self.history_repository: JsonHistoryRepository = JsonHistoryRepository()
+        else:
+            self.history_repository = history_repository
+
         self.recommendation_history: LibraryData = (
             self.history_repository.load_recommendations()
         )
-        self.fetcher: Fetcher = Fetcher(
-            self.library,
-            self.mb_library,
-            self.genre_embeddings,
-            self.tag_embeddings,
-            self.recommendation_history,
-            k,
-            limit,
-            threshold,
-        )
+
+        if (
+            fetcher is None
+        ):  # this is because we want to allow for dependency injection for testing purposes
+            self.mb_library: MusicBrainz = MusicBrainz(app_name, app_version, email)
+            self.library: LibraryData = self.mb_library._load_library(library_path)
+            self.roots: set[str] = self.mb_library.tags.roots
+            self.genre_embeddings: GenreSpace = GenreSpace(self.library, method=method)
+            self.tag_embeddings: TagSpace = TagSpace(
+                self.library, n_clusters=n_clusters
+            )
+
+            self.fetcher: Fetcher = Fetcher(
+                self.library,
+                self.mb_library,
+                self.genre_embeddings,
+                self.tag_embeddings,
+                self.recommendation_history,
+                k,
+                limit,
+                threshold,
+            )
+        else:
+            self.fetcher = fetcher
+
         self.lastfm_api_key = lastfm_api_key
 
     def recommend(self) -> str:
         top_albums = self.fetcher._fetch_recommendations(self.lastfm_api_key)
-        self.history_repository.save_recommendations(top_albums)
+        self.history_repository.add_recommendations(top_albums)
         return top_albums
 
 

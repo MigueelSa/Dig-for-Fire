@@ -59,7 +59,7 @@ class Fetcher:
         self, album: AlbumData
     ) -> tuple[str, tuple[str], str, str | None]:
         title = re.sub(r"\s+", " ", album["title"].lower().strip())
-        title = re.sub(r"\(.*?\)|\[.*?\]|deluxe|remaster(ed)?", "", title)
+        title = re.sub(r"\(.*?\)|\[.*?\]|deluxe|remaster(ed)?", "", title).strip()
         artist = tuple(
             sorted(re.sub(r"\s+", " ", a.lower().strip()) for a in album["artist"] if a)
         )
