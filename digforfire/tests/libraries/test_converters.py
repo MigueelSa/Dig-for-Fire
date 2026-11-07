@@ -87,7 +87,7 @@ def fake_files(tmp_path) -> tuple[str, str]:
     return fake_file, fake_converted_file
 
 
-def test__can_handle(fake_files):
+def test_can_handle(fake_files):
     fake_file, fake_converted_file = fake_files
     assert SpotifyJSONConverter.can_handle(fake_file) is True
 
@@ -99,7 +99,7 @@ def test__convert(fake_files):
     )
 
 
-def test__save_converted_library(fake_files):
+def test_save_converted_library(fake_files):
     fake_file, fake_converted_file = fake_files
     assert SpotifyJSONConverter.convert_and_save(str(fake_file)) == str(
         fake_converted_file
